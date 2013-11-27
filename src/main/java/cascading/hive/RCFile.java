@@ -169,8 +169,9 @@ public class RCFile extends Scheme<JobConf, RecordReader, OutputCollector, Objec
         ByteStream.Output byteStream = (ByteStream.Output) sinkCall.getContext()[0];
         BytesRefArrayWritable rowWritable = (BytesRefArrayWritable) sinkCall.getContext()[1];
         BytesRefWritable[] colValRefs = (BytesRefWritable[]) sinkCall.getContext()[2];
-
-        assert tuple.size() == colValRefs.length;
+        if (tuple.size() != colValRefs.length) {
+            throw new RuntimeException("fields size and length of column buffer not match.");
+        }
 
         byteStream.reset();
         int startPos = 0;

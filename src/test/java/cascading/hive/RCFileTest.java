@@ -72,4 +72,31 @@ public class RCFileTest {
             assertEquals(expected.getString(2), actual.getString(2));
         }
     }
+
+    @Test
+    public void testCompress() throws IOException {
+        Properties p = new Properties();
+        p.put("mapred.output.compress", "true");
+        p.put("mapred.output.compression.type", "BLOCK");
+//        GzipCodec needs native lib, otherwise the output can be read.
+//        p.put("mapred.output.compression.codec", "org.apache.hadoop.io.compress.GzipCodec");
+        connector = new HadoopFlowConnector(p);
+
+        Lfs input = new Lfs(new TextDelimited(true, ","), txt);
+        Pipe pipe = new Pipe("convert");
+        Lfs output = new Lfs(new RCFile(new String[]{"col1", "col2", "col3"},
+                new String[] {"int","string","string"}), "output/rc_compress/", SinkMode.REPLACE);
+        Flow flow = connector.connect(input, output, pipe);
+        flow.complete();
+        //compare result with uncompressed ones
+        TupleEntryIterator it1 = output.openForRead(flow.getFlowProcess());
+        TupleEntryIterator it2 = new Lfs(new RCFile("col1 int, col2 string, col3 string"), rc).openForRead(flow.getFlowProcess());
+        while(it1.hasNext() && it2.hasNext()) {
+            Tuple actual = it1.next().getTuple();
+            Tuple expected = it2.next().getTuple();
+            assertEquals(expected.getInteger(0), actual.getInteger(0));
+            assertEquals(expected.getString(1), actual.getString(1));
+            assertEquals(expected.getString(2), actual.getString(2));
+        }
+    }
 }
