@@ -16,6 +16,7 @@ import org.apache.hadoop.hive.serde2.columnar.BytesRefArrayWritable;
 import org.apache.hadoop.hive.serde2.columnar.BytesRefWritable;
 import org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe;
 import org.apache.hadoop.hive.serde2.columnar.ColumnarStruct;
+import org.apache.hadoop.hive.serde2.lazy.*;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
@@ -26,26 +27,41 @@ import java.io.OutputStream;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Properties;
+import java.util.regex.Pattern;
 
 /**
  * This is a {@link Scheme} subclass. RCFile (Record Columnar File) format can partition the data horizontally(rows) and
  * vertically(columns) and allows to fetch only the specific columns during the processing and avoid the Disk IO penalty
  * with all the columns.
  * This class mainly developed for writing Cascading output to RCFile format to be consumed by Hive afterwards. It also
- * support read RCFile format, but it's not optimized as Hive.
+ * support read RCFile format, also support optimization as Hive(less HDFS_BYTES_READ less CPU).
  */
 public class RCFile extends Scheme<JobConf, RecordReader, OutputCollector, Object[], Object[]> {
 
     private transient ColumnarSerDe serde;
     private String[] types;
+    /*columns' ids(start from zero), concatenated with comma.*/
+    private String selectedColIds = null;
+    /*regular expression for comma separated string for column ids.*/
+    private static final Pattern COMMA_SEPARATED_IDS = Pattern.compile("^([0-9]+,)*[0-9]+$");
 
     /**Construct an instance of RCFile using specified array of field names and types.
     * @param names field names
     * @param types field types
     * */
     public RCFile(String[] names, String[] types) {
+        this(names, types, null);
+    }
+
+    /**Construct an instance of RCFile using specified array of field names and types.
+     * @param names field names
+     * @param types field types
+     * @param selectedColIds a list of column ids (started from 0) to explicitly specify which columns will be used
+     * */
+    public RCFile(String[] names, String[] types, String selectedColIds) {
         super(new Fields(names), new Fields(names));
         this.types = types;
+        this.selectedColIds = selectedColIds;
         validate();
     }
 
@@ -57,11 +73,24 @@ public class RCFile extends Scheme<JobConf, RecordReader, OutputCollector, Objec
     * @param hiveScheme hive table scheme
     */
     public RCFile(String hiveScheme) {
+        this(hiveScheme, null);
+    }
+
+    /**
+     * Construct an instance of RCFile using hive table scheme. Table schema should be a space and comma separated string
+     * describing the Hive schema, e.g.:
+     * uid BIGINT, name STRING, description STRING
+     * specifies 3 fields
+     * @param hiveScheme hive table scheme
+     * @param selectedColIds a list of column ids (started from 0) to explicitly specify which columns will be used
+     */
+    public RCFile(String hiveScheme, String selectedColIds) {
         ArrayList<String>[] lists = HiveSchemaUtil.parse(hiveScheme);
         Fields fields = new Fields(lists[0].toArray(new String[lists[0].size()]));
         setSinkFields(fields);
         setSourceFields(fields);
         this.types = lists[1].toArray(new String[lists[1].size()]);
+        this.selectedColIds = selectedColIds;
         validate();
     }
 
@@ -69,12 +98,20 @@ public class RCFile extends Scheme<JobConf, RecordReader, OutputCollector, Objec
         if (types.length != getSourceFields().size()) {
             throw new IllegalArgumentException("fields size and length of fields types not match.");
         }
+        if (selectedColIds != null) {
+            if (!COMMA_SEPARATED_IDS.matcher(selectedColIds).find()) {
+                throw new IllegalArgumentException("selected column ids must in comma separated formatted");
+            }
+        }
 
     }
 
     @Override
     public void sourceConfInit(FlowProcess<JobConf> flowProcess, Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
         conf.setInputFormat(RCFileInputFormat.class);
+        if (selectedColIds != null) {
+            conf.set(HiveProps.HIVE_SELECTD_COLUMN_IDS, selectedColIds);
+        }
     }
 
     @Override
@@ -132,7 +169,10 @@ public class RCFile extends Scheme<JobConf, RecordReader, OutputCollector, Objec
             ColumnarStruct struct = (ColumnarStruct) serde.deserialize(value);
             ArrayList<Object> objects = struct.getFieldsAsList();
             tuple.clear();
-            tuple.addAll(objects.toArray());
+            for (Object o : objects) {
+                //each field has to be explicitly converted, otherwise will get error due to unable to load serializer for hive lazy types.
+                tuple.add(sourceField(o));
+            }
             return true;
         } catch (SerDeException e) {
             throw new IOException(e);
@@ -198,7 +238,29 @@ public class RCFile extends Scheme<JobConf, RecordReader, OutputCollector, Objec
             out.write(field.toString().getBytes());
         }
         //TODO: need handle more cases
+    }
 
+    /*convert hive lazy objects to java objects */
+    private Object sourceField(Object value) {
+        if (value instanceof LazyString) {
+            value = ((LazyString) value).getWritableObject().toString();
+        } else if (value instanceof LazyInteger) {
+            value = ((LazyInteger) value).getWritableObject().get();
+        } else if (value instanceof LazyLong) {
+            value = ((LazyLong) value).getWritableObject().get();
+        } else if (value instanceof LazyFloat) {
+            value = ((LazyFloat) value).getWritableObject().get();
+        } else if (value instanceof LazyDouble) {
+            value = ((LazyDouble) value).getWritableObject().get();
+        } else if (value instanceof LazyBoolean) {
+            value = ((LazyBoolean) value).getWritableObject().get();
+        } else if (value instanceof LazyByte) {
+            value = (int) ((LazyByte) value).getWritableObject().get();
+        } else if (value instanceof LazyShort) {
+            value = ((LazyShort) value).getWritableObject().get();
+        }
+        //TODO: need handle more types
+        return value;
 
     }
 

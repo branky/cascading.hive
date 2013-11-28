@@ -4,13 +4,14 @@ import cascading.flow.Flow;
 import cascading.flow.FlowConnector;
 import cascading.flow.hadoop.HadoopFlowConnector;
 import cascading.pipe.Pipe;
+import cascading.pipe.assembly.CountBy;
 import cascading.scheme.hadoop.TextDelimited;
 import cascading.tap.SinkMode;
 import cascading.tap.hadoop.Lfs;
+import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntryIterator;
 import junitx.framework.FileAssert;
-import org.apache.commons.io.FileUtils;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
@@ -40,7 +41,7 @@ public class RCFileTest {
     @AfterClass
     public static void tearDown() throws IOException
     {
-        FileUtils.deleteDirectory(new File("output"));
+     //   FileUtils.deleteDirectory(new File("output"));
     }
 
     @Test
@@ -97,6 +98,28 @@ public class RCFileTest {
             assertEquals(expected.getInteger(0), actual.getInteger(0));
             assertEquals(expected.getString(1), actual.getString(1));
             assertEquals(expected.getString(2), actual.getString(2));
+        }
+    }
+    @Test
+    public void testProjection() throws IOException {
+        Lfs input = new Lfs(new RCFile("col1 int, col2 string, col3 string", "0"), rc);
+        Pipe pipe = new Pipe("testGroupBy");
+        pipe = new CountBy(pipe, new Fields("col1"), new Fields("cnt"));
+        Lfs output = new Lfs(new TextDelimited(true, ","), "output/rc_count/", SinkMode.REPLACE);
+        Flow flow = connector.connect(input, output, pipe);
+        flow.complete();
+        TupleEntryIterator it = output.openForRead(flow.getFlowProcess());
+        Tuple[] expected = new Tuple[] {
+                new Tuple("1", "3"),
+                new Tuple("2", "3"),
+                new Tuple("3", "1"),
+                new Tuple("4", "3"),
+                new Tuple("5", "3")
+        };
+        int i = 0;
+        while (it.hasNext()) {
+            Tuple actual = it.next().getTuple();
+            assertEquals(expected[i++], actual);
         }
     }
 }
