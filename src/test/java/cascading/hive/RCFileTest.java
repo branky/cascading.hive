@@ -2,7 +2,7 @@ package cascading.hive;
 
 import cascading.flow.Flow;
 import cascading.flow.FlowConnector;
-import cascading.flow.hadoop.HadoopFlowConnector;
+import cascading.flow.hadoop2.Hadoop2MR1FlowConnector;
 import cascading.pipe.Pipe;
 import cascading.pipe.assembly.CountBy;
 import cascading.scheme.hadoop.TextDelimited;
@@ -33,7 +33,7 @@ public class RCFileTest {
 
     @Before
     public void setup() {
-        connector = new HadoopFlowConnector(new Properties());
+        connector = new Hadoop2MR1FlowConnector(new Properties());
         rc = "src/test/resources/data/test.rc";
         txt = "src/test/resources/data/test.txt";
     }
@@ -81,7 +81,7 @@ public class RCFileTest {
         p.put("mapred.output.compression.type", "BLOCK");
 //        GzipCodec needs native lib, otherwise the output can be read.
 //        p.put("mapred.output.compression.codec", "org.apache.hadoop.io.compress.GzipCodec");
-        connector = new HadoopFlowConnector(p);
+        connector = new Hadoop2MR1FlowConnector(p);
 
         Lfs input = new Lfs(new TextDelimited(true, ","), txt);
         Pipe pipe = new Pipe("convert");
@@ -101,9 +101,9 @@ public class RCFileTest {
         }
     }
     @Test
-    public void testProjection() throws IOException {
+    public void testCountBy() throws IOException {
         Lfs input = new Lfs(new RCFile("col1 int, col2 string, col3 string", "0"), rc);
-        Pipe pipe = new Pipe("testGroupBy");
+        Pipe pipe = new Pipe("testCountBy");
         pipe = new CountBy(pipe, new Fields("col1"), new Fields("cnt"));
         Lfs output = new Lfs(new TextDelimited(true, ","), "output/rc_count/", SinkMode.REPLACE);
         Flow flow = connector.connect(input, output, pipe);
