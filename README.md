@@ -2,4 +2,4 @@
 
  This is the Cascading.Hive module.
 
- It provides support for reading/writing data in Hive native file format: RCFile, ORC etc.
+ It provides Cascading Tap/Scheme for HCatalog and Scheme for Hive native file formats(RCFile and ORC).
