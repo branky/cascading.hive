@@ -59,7 +59,7 @@ public class RCFileTest {
         Lfs input = new Lfs(new TextDelimited(true, ","), txt);
         Pipe pipe = new Pipe("convert");
         Lfs output = new Lfs(new RCFile(new String[]{"col1", "col2", "col3"},
-                new String[] {"int","string","string"}), "output/rc_write/", SinkMode.REPLACE);
+                new String[] {"int","string","string"}), "out/rc_write/", SinkMode.REPLACE);
         Flow flow = connector.connect(input, output, pipe);
         flow.complete();
 

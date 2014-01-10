@@ -15,4 +15,5 @@ public class HiveProps {
     public static final String HIVE_SELECTD_COLUMNS = ColumnProjectionUtils.READ_COLUMN_NAMES_CONF_STR;
     */
     public static final String HIVE_SELECTD_COLUMN_IDS = ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR;
+    public static final String HIVE_READ_ALL_COLUMNS = "hive.io.file.read.all.columns";
 }

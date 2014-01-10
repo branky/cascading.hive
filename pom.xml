@@ -35,6 +35,10 @@
 			<id>conjars.org</id>
 			<url>http://conjars.org/repo</url>
 		</repository>
+		<repository>
+			<id>releases.sonatype.org</id>
+			<url>http://oss.sonatype.org/content/repositories/releases</url>
+		</repository>
 	</repositories>
 
 	<distributionManagement>
@@ -80,7 +84,6 @@
 			<groupId>org.apache.hive</groupId>
 			<artifactId>hive-exec</artifactId>
 			<version>${hive.version}</version>
-			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.hive.hcatalog</groupId>

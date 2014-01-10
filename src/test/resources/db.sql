@@ -42,6 +42,7 @@ CREATE TABLE DBS (
 
 INSERT INTO DBS (DB_ID, DESC, DB_LOCATION_URI, NAME) VALUES (1,'Default Hive database','hdfs://localhost:8020/apps/hive/warehouse','default');
 
+
 DROP TABLE IF EXISTS PARTITIONS;
 CREATE TABLE PARTITIONS (
   PART_ID numeric(20) NOT NULL,
