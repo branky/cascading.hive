@@ -12,11 +12,25 @@
  * limitations under the License.
  */
 
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cascading.hive;
 
 import cascading.flow.Flow;
 import cascading.flow.FlowConnector;
-import cascading.flow.hadoop2.Hadoop2MR1FlowConnector;
+import cascading.flow.hadoop.HadoopFlowConnector;
 import cascading.pipe.Pipe;
 import cascading.pipe.assembly.CountBy;
 import cascading.scheme.hadoop.TextDelimited;
@@ -47,7 +61,7 @@ public class RCFileTest {
 
     @Before
     public void setup() {
-        connector = new Hadoop2MR1FlowConnector(new Properties());
+        connector = new HadoopFlowConnector(new Properties());
         rc = "src/test/resources/data/test.rc";
         txt = "src/test/resources/data/test.txt";
     }
@@ -95,7 +109,7 @@ public class RCFileTest {
         p.put("mapred.output.compression.type", "BLOCK");
 //        GzipCodec needs native lib, otherwise the output can be read.
 //        p.put("mapred.output.compression.codec", "org.apache.hadoop.io.compress.GzipCodec");
-        connector = new Hadoop2MR1FlowConnector(p);
+        connector = new HadoopFlowConnector(p);
 
         Lfs input = new Lfs(new TextDelimited(true, ","), txt);
         Pipe pipe = new Pipe("convert");
