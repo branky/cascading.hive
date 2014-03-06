@@ -12,6 +12,20 @@
  * limitations under the License.
  */
 
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cascading.hcatalog;
 
 import cascading.flow.FlowProcess;
@@ -79,20 +93,50 @@ public abstract class HCatScheme extends
 	@Override
 	public void sourceConfInit(FlowProcess<JobConf> flowProcess,
 			Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
-
-		hiveTable = CascadingHCatUtil.getHiveTable(db, table, conf);
 		conf.setInputFormat(getTableInputFormat(hiveTable, filter, conf));
-
-		hCatSchema = getTableHCatSchema(hiveTable, filter, conf);
-		Fields fieldsFromSchema = new Fields(createFieldsArray(hCatSchema));
-
-		if (sourceFields == null) {
-			setSourceFields(fieldsFromSchema);
-		} else {
-			validate(fieldsFromSchema);
-			setSourceFields(sourceFields);
-		}
 	}
+
+    /**
+     *This method is invoked by {@link cascading.flow.BaseFlow}, before {@link #sourceConfInit}.
+     *
+     * @param flowProcess of type FlowProcess
+     * @param tap         of type Tap
+     * @return Fields
+     */
+    public Fields retrieveSourceFields(FlowProcess<JobConf> flowProcess, Tap tap) {
+        JobConf conf = flowProcess.getConfigCopy();
+        hiveTable = CascadingHCatUtil.getHiveTable(db, table, conf);
+        hCatSchema = getTableHCatSchema(hiveTable, filter, conf);
+        Fields fieldsFromSchema = new Fields(createFieldsArray(hCatSchema));
+        if (sourceFields == null) {
+            setSourceFields(fieldsFromSchema);
+        } else {
+            validate(fieldsFromSchema);
+            setSourceFields(sourceFields);
+        }
+        return fieldsFromSchema;
+    }
+
+    /**
+     *This method is invoked by {@link cascading.flow.BaseFlow}, before {@link #sinkConfInit}.
+     *
+     * @param flowProcess of type FlowProcess
+     * @param tap         of type Tap
+     * @return Fields
+     */
+    public Fields retrieveSinkFields( FlowProcess<JobConf> flowProcess, Tap tap ){
+        JobConf conf = flowProcess.getConfigCopy();
+        hiveTable = CascadingHCatUtil.getHiveTable(db, table, conf);
+        hCatSchema = getTableHCatSchema(hiveTable, filter, conf);
+        Fields fieldsFromSchema = new Fields(createFieldsArray(hCatSchema));
+        if (sourceFields == null) {
+            setSinkFields(fieldsFromSchema);
+        } else {
+            validate(fieldsFromSchema);
+            setSinkFields(sourceFields);
+        }
+        return fieldsFromSchema;
+    }
 
 	private void validate(Fields fieldsFromSchema) {
 		if (!fieldsFromSchema.contains(sourceFields)) {
@@ -128,11 +172,7 @@ public abstract class HCatScheme extends
 	@Override
 	public void sinkConfInit(FlowProcess<JobConf> flowProcess,
 			Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
-
-		hiveTable = CascadingHCatUtil.getHiveTable(db, table, conf);
 		conf.setOutputFormat(getTableOutputFormat(hiveTable, filter, conf));
-
-		hCatSchema = getTableHCatSchema(hiveTable, filter, conf);
 	}
 
 	/**

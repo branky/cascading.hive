@@ -12,6 +12,20 @@
  * limitations under the License.
  */
 
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cascading.hcatalog;
 
 import cascading.flow.FlowProcess;
@@ -45,6 +59,7 @@ public class HCatTap extends Tap<JobConf, RecordReader, OutputCollector> {
 	private String filter;
 	private String path;
 	private Tap<JobConf, RecordReader, OutputCollector> tap;
+    private String identifier;
 
 	public HCatTap(String table) {
 		this(null, table, null, null, null, null, SinkMode.REPLACE);
@@ -97,7 +112,21 @@ public class HCatTap extends Tap<JobConf, RecordReader, OutputCollector> {
 		this.table = table;
 		this.filter = filter;
 		this.path = path;
+
+        resolveIdentifier();
 	}
+
+    private void resolveIdentifier() {
+        StringBuilder sb = new StringBuilder("hcatalog://").
+                append(this.db).append(".").append(this.table);
+        if (this.path != null) {
+            sb.append("?path=").append(this.path);
+        }
+        if (this.filter != null) {
+            sb.append(this.filter);
+        }
+        identifier = sb.toString();
+    }
 
 	@Override
 	public void sourceConfInit(FlowProcess<JobConf> process, JobConf conf) {
@@ -126,7 +155,7 @@ public class HCatTap extends Tap<JobConf, RecordReader, OutputCollector> {
 
 	@Override
 	public String getIdentifier() {
-		return db + "." + table + "." + filter;
+        return identifier;
 	}
 
 	@Override
