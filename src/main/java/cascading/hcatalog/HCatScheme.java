@@ -26,6 +26,20 @@
  * limitations under the License.
  */
 
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cascading.hcatalog;
 
 import cascading.flow.FlowProcess;
@@ -37,6 +51,9 @@ import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
 import org.apache.hadoop.hive.ql.metadata.Table;
+import org.apache.hadoop.hive.serde2.Deserializer;
+import org.apache.hadoop.hive.serde2.SerDeException;
+import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
@@ -51,6 +68,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.Random;
 
 @SuppressWarnings({ "serial", "rawtypes" })
@@ -64,9 +82,15 @@ public abstract class HCatScheme extends
 	private String table;
 	private String filter;
 	private int randomNumber;
-	private Table hiveTable;
 	private HCatSchema hCatSchema;
 	private Fields sourceFields;
+
+    private String serdeName;
+    private Properties tableMetadata;
+    private Class<? extends InputFormat> inputFormat;
+    private Class<? extends OutputFormat> outputFormat;
+    //SerDe is not Serializable
+    private transient Deserializer serDe;
 
 /**
 	 * 
@@ -90,10 +114,25 @@ public abstract class HCatScheme extends
 		randomNumber = new Random(System.currentTimeMillis()).nextInt();
 	}
 
+    private void createSerDe(JobConf conf) {
+        try {
+            serDe = SerDeUtils.lookupDeserializer(serdeName);
+            serDe.initialize(conf, tableMetadata);
+        } catch (SerDeException e) {
+            throw new RuntimeException("Unable to create serDe with name=" + serdeName + ", metadata=" + tableMetadata);
+        }
+
+    }
+
+    protected Deserializer getSerDe() {
+        return serDe;
+    }
+
 	@Override
 	public void sourceConfInit(FlowProcess<JobConf> flowProcess,
 			Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
-		conf.setInputFormat(getTableInputFormat(hiveTable, filter, conf));
+		conf.setInputFormat(inputFormat);
+        createSerDe(conf);
 	}
 
     /**
@@ -105,7 +144,11 @@ public abstract class HCatScheme extends
      */
     public Fields retrieveSourceFields(FlowProcess<JobConf> flowProcess, Tap tap) {
         JobConf conf = flowProcess.getConfigCopy();
-        hiveTable = CascadingHCatUtil.getHiveTable(db, table, conf);
+        Table hiveTable = CascadingHCatUtil.getHiveTable(db, table, conf);
+        serdeName = hiveTable.getSerializationLib();
+        tableMetadata = hiveTable.getMetadata();
+        inputFormat = hiveTable.getInputFormatClass();
+        outputFormat = hiveTable.getOutputFormatClass();
         hCatSchema = getTableHCatSchema(hiveTable, filter, conf);
         Fields fieldsFromSchema = new Fields(createFieldsArray(hCatSchema));
         if (sourceFields == null) {
@@ -126,8 +169,12 @@ public abstract class HCatScheme extends
      */
     public Fields retrieveSinkFields( FlowProcess<JobConf> flowProcess, Tap tap ){
         JobConf conf = flowProcess.getConfigCopy();
-        hiveTable = CascadingHCatUtil.getHiveTable(db, table, conf);
+        Table hiveTable = CascadingHCatUtil.getHiveTable(db, table, conf);
         hCatSchema = getTableHCatSchema(hiveTable, filter, conf);
+        serdeName = hiveTable.getSerializationLib();
+        tableMetadata = hiveTable.getMetadata();
+        inputFormat = hiveTable.getInputFormatClass();
+        outputFormat = hiveTable.getOutputFormatClass();
         Fields fieldsFromSchema = new Fields(createFieldsArray(hCatSchema));
         if (sourceFields == null) {
             setSinkFields(fieldsFromSchema);
@@ -150,16 +197,6 @@ public abstract class HCatScheme extends
 		String[] fieldsArray = fields.toArray(new String[fields.size()]);
 		return fieldsArray;
 	}
-
-	/**
-	 * @param hiveTable
-	 * @param filter
-	 * @param conf
-	 * @return
-	 */
-	protected abstract Class<? extends InputFormat> getTableInputFormat(
-			Table hiveTable, String filter, JobConf conf);
-
 	/**
 	 * @param hiveTable
 	 * @param filter
@@ -172,17 +209,9 @@ public abstract class HCatScheme extends
 	@Override
 	public void sinkConfInit(FlowProcess<JobConf> flowProcess,
 			Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
-		conf.setOutputFormat(getTableOutputFormat(hiveTable, filter, conf));
+		conf.setOutputFormat(outputFormat);
+        createSerDe(conf);
 	}
-
-	/**
-	 * @param hiveTable
-	 * @param filter
-	 * @param conf
-	 * @return
-	 */
-	protected abstract Class<? extends OutputFormat> getTableOutputFormat(
-			Table hiveTable, String filter, JobConf conf);
 
 	@Override
 	public void sourcePrepare(FlowProcess<JobConf> flowProcess,
@@ -191,14 +220,16 @@ public abstract class HCatScheme extends
 				sourceCall.getInput().createValue() };
 
 		sourceCall.setContext(pair);
+        createSerDe(flowProcess.getConfigCopy());
 	}
 
 	@Override
 	public void sinkPrepare(FlowProcess<JobConf> flowProcess,
 			SinkCall<Object[], OutputCollector> sinkCall) throws IOException {
 		List<TypeInfo> colTypes = new ArrayList<TypeInfo>();
+        List<HCatFieldSchema> fields = getHCatSchema().getFields();
 
-		for (HCatFieldSchema fieldSchema : getHCatSchema().getFields()) {
+        for (HCatFieldSchema fieldSchema : fields) {
 			colTypes.add(TypeInfoUtils.getTypeInfoFromTypeString(fieldSchema
 					.getTypeString()));
 		}
@@ -208,7 +239,10 @@ public abstract class HCatScheme extends
 		ObjectInspector rowOI = TypeInfoUtils
 				.getStandardJavaObjectInspectorFromTypeInfo(rowTypeInfo);
 
-		sinkCall.setContext(new Object[] { rowOI });
+		sinkCall.setContext(new Object[] {rowOI, new ArrayList<Object>(), fields});
+
+
+        createSerDe(flowProcess.getConfigCopy());
 	}
 
 	@Override
@@ -278,9 +312,6 @@ public abstract class HCatScheme extends
 		return filter;
 	}
 
-	protected Table getHiveTable() {
-		return hiveTable;
-	}
 
 	protected HCatSchema getHCatSchema() {
 		return hCatSchema;
