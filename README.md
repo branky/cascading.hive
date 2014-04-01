@@ -33,7 +33,7 @@ Projection pushdown
 Both RC and ORC support projection pushdown to reduce read I/O when only a subset of fields needed.
 
 
-You can enalbe this either by creating the scheme using additional argument to indicate the selected columns, e.g.
+You can enable this either by creating the scheme using additional argument to indicate the selected columns, e.g.
 
 ```
 //only col1 and col4 will be read
@@ -49,6 +49,10 @@ or by setting Hive specific properties for your flow:
 hive.io.file.read.all.columns=false
 hive.io.file.readcolumn.ids=0,3
 ```
+
+Read and write Parquet format through HCatalog
+----------------------------------------------
+[Parquet](http://parquet.io/) is another widely used columnar format for Hadoop data. Through [HCatTap](https://github.com/branky/cascading.hive/blob/master/src/main/java/cascading/hcatalog/HCatTap.java), you can read and write tables in Parquet format, without using Parquet's [Cascading specific schemes](https://github.com/Parquet/parquet-mr/tree/master/parquet-cascading).
 
 
  
