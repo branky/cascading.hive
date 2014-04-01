@@ -40,6 +40,20 @@
  * limitations under the License.
  */
 
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cascading.hcatalog;
 
 import cascading.flow.Flow;
@@ -55,6 +69,7 @@ import cascading.scheme.hadoop.TextDelimited;
 import cascading.tap.SinkMode;
 import cascading.tap.hadoop.Lfs;
 import cascading.tuple.Fields;
+import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntryIterator;
 import junitx.framework.FileAssert;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
@@ -168,5 +183,27 @@ public class HCatTapTest {
         List<String> location = CascadingHCatUtil.getDataStorageLocation(
                 MetaStoreUtils.DEFAULT_DATABASE_NAME, "test_orc", null, (JobConf) flow.getFlowProcess().getConfigCopy());
         assertEquals(location.get(0), resultPath);
+    }
+
+    @Test
+    public void testParquetIn() throws IOException {
+        HCatTap source = new HCatTap("test_parquet");
+        Lfs output = new Lfs(new TextDelimited(false, "|"), resultPath, SinkMode.REPLACE);
+        Pipe pipe = new Pipe("testParquet");
+        pipe = new Each(pipe, new Fields("col1"), new ExpressionFilter("col1 != 1", Integer.TYPE));
+        Flow flow = connector.connect(source, output, pipe);
+        flow.complete();
+
+        TupleEntryIterator it = output.openForRead(flow.getFlowProcess());
+        Tuple[] expected = new Tuple[] {
+                new Tuple("1", "a", "A"),
+                new Tuple("1", "b", "B"),
+                new Tuple("1", "c", "C"),
+        };
+        int i = 0;
+        while (it.hasNext()) {
+            Tuple actual = it.next().getTuple();
+            assertEquals(expected[i++], actual);
+        }
     }
 }
