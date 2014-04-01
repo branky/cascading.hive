@@ -54,6 +54,20 @@
  * limitations under the License.
  */
 
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cascading.hcatalog;
 
 import cascading.flow.FlowProcess;
@@ -98,7 +112,7 @@ public abstract class HCatScheme extends
 	private String filter;
 	private int randomNumber;
 	private HCatSchema hCatSchema;
-	private Fields sourceFields;
+	private Fields fields;
 
     private String serdeName;
     private Properties tableMetadata;
@@ -124,7 +138,7 @@ public abstract class HCatScheme extends
 		this.db = CascadingHCatUtil.hcatDefaultDBIfNull(db);
 		this.table = table;
 		this.filter = filter;
-		this.sourceFields = sourceFields;
+		this.fields = sourceFields;
 
 		randomNumber = new Random(System.currentTimeMillis()).nextInt();
 	}
@@ -150,6 +164,25 @@ public abstract class HCatScheme extends
         createSerDe(conf);
 	}
 
+    private Fields retrieveFieldsFromHCat(JobConf conf) {
+        Table hiveTable = CascadingHCatUtil.getHiveTable(db, table, conf);
+        serdeName = hiveTable.getSerializationLib();
+        tableMetadata = hiveTable.getMetadata();
+        inputFormat = hiveTable.getInputFormatClass();
+        outputFormat = hiveTable.getOutputFormatClass();
+        hCatSchema = getTableHCatSchema(hiveTable, filter, conf);
+        Fields fieldsFromSchema = new Fields(createFieldsArray(hCatSchema));
+        if (fields == null) {
+            setSourceFields(fieldsFromSchema);
+            setSinkFields(fieldsFromSchema);
+        } else {
+            validate(fieldsFromSchema);
+            setSourceFields(fields);
+            setSinkFields(fields);
+        }
+        return fieldsFromSchema;
+    }
+
     /**
      *This method is invoked by {@link cascading.flow.BaseFlow}, before {@link #sourceConfInit}.
      *
@@ -159,20 +192,7 @@ public abstract class HCatScheme extends
      */
     public Fields retrieveSourceFields(FlowProcess<JobConf> flowProcess, Tap tap) {
         JobConf conf = flowProcess.getConfigCopy();
-        Table hiveTable = CascadingHCatUtil.getHiveTable(db, table, conf);
-        serdeName = hiveTable.getSerializationLib();
-        tableMetadata = hiveTable.getMetadata();
-        inputFormat = hiveTable.getInputFormatClass();
-        outputFormat = hiveTable.getOutputFormatClass();
-        hCatSchema = getTableHCatSchema(hiveTable, filter, conf);
-        Fields fieldsFromSchema = new Fields(createFieldsArray(hCatSchema));
-        if (sourceFields == null) {
-            setSourceFields(fieldsFromSchema);
-        } else {
-            validate(fieldsFromSchema);
-            setSourceFields(sourceFields);
-        }
-        return fieldsFromSchema;
+        return retrieveFieldsFromHCat(conf);
     }
 
     /**
@@ -184,27 +204,12 @@ public abstract class HCatScheme extends
      */
     public Fields retrieveSinkFields( FlowProcess<JobConf> flowProcess, Tap tap ){
         JobConf conf = flowProcess.getConfigCopy();
-        Table hiveTable = CascadingHCatUtil.getHiveTable(db, table, conf);
-        hCatSchema = getTableHCatSchema(hiveTable, filter, conf);
-        serdeName = hiveTable.getSerializationLib();
-        tableMetadata = hiveTable.getMetadata();
-        inputFormat = hiveTable.getInputFormatClass();
-        outputFormat = hiveTable.getOutputFormatClass();
-        Fields fieldsFromSchema = new Fields(createFieldsArray(hCatSchema));
-        if (sourceFields == null) {
-            setSinkFields(fieldsFromSchema);
-        } else {
-            validate(fieldsFromSchema);
-            setSinkFields(sourceFields);
-        }
-
-
-        return fieldsFromSchema;
+        return retrieveFieldsFromHCat(conf);
     }
 
 	private void validate(Fields fieldsFromSchema) {
-		if (!fieldsFromSchema.contains(sourceFields)) {
-			throw new IllegalArgumentException("Source fields:" + sourceFields
+		if (!fieldsFromSchema.contains(fields)) {
+			throw new IllegalArgumentException("Source fields:" + fields
 					+ " must match table schema:" + fieldsFromSchema);
 		}
 	}

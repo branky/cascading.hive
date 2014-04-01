@@ -54,6 +54,20 @@
  * limitations under the License.
  */
 
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package cascading.hcatalog;
 
 import cascading.flow.Flow;
@@ -172,13 +186,24 @@ public class HCatTapTest {
         Flow flow = connector.connect(source, output, pipe);
         flow.complete();
 
+        Tuple[] expected = new Tuple[] {
+                new Tuple(1, "a", "A"),
+                new Tuple(1, "b", "B"),
+                new Tuple(1, "c", "C"),
+                new Tuple(2, "b", "B"),
+                new Tuple(2, "c", "C"),
+                new Tuple(2, "d", "D"),
+                new Tuple(3, "c", "C")
+        };
+
         TupleEntryIterator iterator = output.openForRead(flow.getFlowProcess());
-        int count = 0;
+        int i = 0;
+
         while (iterator.hasNext()) {
-            iterator.next();
-            count ++;
+            Tuple actual = iterator.next().getTuple();
+            assertEquals(expected[i++], actual);
         }
-        assertTrue(count == 7);
+        assertTrue(i == 7);
 
         List<String> location = CascadingHCatUtil.getDataStorageLocation(
                 MetaStoreUtils.DEFAULT_DATABASE_NAME, "test_orc", null, (JobConf) flow.getFlowProcess().getConfigCopy());
@@ -198,7 +223,7 @@ public class HCatTapTest {
         Tuple[] expected = new Tuple[] {
                 new Tuple("1", "a", "A"),
                 new Tuple("1", "b", "B"),
-                new Tuple("1", "c", "C"),
+                new Tuple("1", "c", "C"),  //it's read from text file, then all values are in string
         };
         int i = 0;
         while (it.hasNext()) {
