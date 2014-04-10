@@ -1,13 +1,9 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -49,9 +45,39 @@ public class OrcOutputFormat extends FileOutputFormat<NullWritable, OrcSerdeRow>
         private final Path path;
         private final OrcFile.WriterOptions options;
 
-        OrcRecordWriter(Path path, OrcFile.WriterOptions options) {
+        OrcRecordWriter(Path path, OrcFile.WriterOptions options, JobConf conf) {
             this.path = path;
             this.options = options;
+            /*to enable override compression properties from job conf*/
+            String compression = conf.get(OrcFile.COMPRESSION);
+            if (compression != null) {
+                this.options.compress(CompressionKind.valueOf(compression));
+            }
+            String compressSize = conf.get(OrcFile.COMPRESSION_BLOCK_SIZE);
+            if (compressSize != null && !"".equals(compressSize.trim())) {
+                this.options.bufferSize(Integer.parseInt(compressSize));
+            }
+
+            String stripeSize = conf.get(OrcFile.STRIPE_SIZE);
+            if (stripeSize != null && !"".equals(stripeSize.trim())) {
+                this.options.stripeSize(Long.parseLong(stripeSize));
+            }
+
+            String strideSize = conf.get(OrcFile.ROW_INDEX_STRIDE);
+            if (strideSize != null && !"".equals(strideSize.trim())) {
+                this.options.rowIndexStride(Integer.parseInt(strideSize));
+            }
+
+            String enableIndexes = conf.get(OrcFile.ENABLE_INDEXES);
+            if (enableIndexes != null && "false".equals(enableIndexes)) {
+                this.options.rowIndexStride(0);
+            }
+
+            String blockPadding = conf.get(OrcFile.BLOCK_PADDING);
+            if (blockPadding != null && !"".equals(blockPadding)) {
+                this.options.blockPadding(Boolean.valueOf(blockPadding));
+            }
+
         }
 
         @Override
@@ -100,7 +126,7 @@ public class OrcOutputFormat extends FileOutputFormat<NullWritable, OrcSerdeRow>
     getRecordWriter(FileSystem fileSystem, JobConf conf, String name,
                     Progressable reporter) throws IOException {
         return new
-                OrcRecordWriter(new Path(getWorkOutputPath(conf), name), OrcFile.writerOptions(conf));
+                OrcRecordWriter(new Path(getWorkOutputPath(conf), name), OrcFile.writerOptions(conf), conf);
     }
 
     @Override
@@ -147,6 +173,6 @@ public class OrcOutputFormat extends FileOutputFormat<NullWritable, OrcSerdeRow>
                             (OrcFile.BLOCK_PADDING)));
         }
 
-        return new OrcRecordWriter(path, options);
+        return new OrcRecordWriter(path, options, conf);
     }
 }

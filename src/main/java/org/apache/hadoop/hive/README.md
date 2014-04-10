@@ -10,3 +10,5 @@ OrcProto.java is copied from ql/src/gen/protobuf/gen-java/org/apache/hadoop/hive
 
 It also includes patch for ORC bugs which fixed on Hive 0.13
 https://issues.apache.org/jira/browse/HIVE-6369
+
+It also includes patch for setting compression and index properties for ORC through JobConf.
