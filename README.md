@@ -50,7 +50,13 @@ hive.io.file.read.all.columns=false
 hive.io.file.readcolumn.ids=0,3
 ```
 
+HCatalog usage
+--------------
+To talk with your production HCatalog, you have to include real hive-site.xml in your artifact. Once you build a fat jar artifact, you need to add datanucleus libs into CLASSPATH, because they are excluded from this artifact.
 
+```
+hadoop jar $your_fat_jar -libjars $HIVE_HOME/lib/datanucleus-core-3.2.2.jar,$HIVE_HOME/lib/datanucleus-rdbms-3.2.1.jar,$HIVE_HOME/lib/datanucleus-api-jdo-3.2.2.jar $your_options
+```
  
 
 
