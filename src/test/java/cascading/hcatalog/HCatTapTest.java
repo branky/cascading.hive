@@ -26,48 +26,6 @@
  * limitations under the License.
  */
 
-/*
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-/*
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-/*
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package cascading.hcatalog;
 
 import cascading.flow.Flow;
@@ -88,7 +46,6 @@ import cascading.tuple.TupleEntryIterator;
 import junitx.framework.FileAssert;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.mapred.JobConf;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -116,33 +73,24 @@ public class HCatTapTest {
 		resultPath = "output/";
 	}
 
-	@After
-	public void tearDown() throws Exception {
-		connector = null;
-		hcatOut = null;
-		hcatIn = null;
-		hcatResultFields = null;
-		resultPath = null;
-	}
-
 	@Test
 	public void testDataIn() {
 		HCatTap source = new HCatTap("sample_07");
-		Lfs output = new Lfs(new TextDelimited(false, "|"), resultPath,
+		Lfs output = new Lfs(new TextDelimited(false, "|"), resultPath + "testDataIn",
 				SinkMode.REPLACE);
         Each pipe = new Each("test", new Identity(new Fields("code", "description", "total_emp", "salary")));
 		Flow flow = connector.connect(source, output, pipe);
 		flow.complete();
 
 		FileAssert.assertEquals(new File(hcatOut),
-				new File(resultPath + "part-00000"));
+				new File(resultPath + "testDataIn/part-00000"));
 	}
 
 	@Test
 	public void testDataOut() {
 		Lfs input = new Lfs(new TextDelimited(new Fields("code", "description",
 				"total_emp", "salary"), "|"), hcatOut);
-		HCatTap output = new HCatTap("sample_08", resultPath);
+		HCatTap output = new HCatTap("sample_08", resultPath + "testDataOut");
 
 		Coerce pipe = new Coerce(new Pipe("test"), new Fields("total_emp"),
 				Integer.class);
@@ -151,26 +99,26 @@ public class HCatTapTest {
 		Flow flow = connector.connect(input, output, pipe);
 		flow.complete();
 
-		FileAssert.assertEquals(new File(resultPath + "part-00000"), new File(hcatIn));
+		FileAssert.assertEquals(new File(resultPath + "testDataOut/part-00000"), new File(hcatIn));
 	}
 
 	@Test
 	public void testDataInWithSouceFields() {
 		HCatTap source = new HCatTap("sample_07", new Fields("code", "salary"));
-		Lfs output = new Lfs(new TextDelimited(false, "|"), resultPath,
+		Lfs output = new Lfs(new TextDelimited(false, "|"), resultPath + "testDataInWithSouceFields",
 				SinkMode.REPLACE);
 
 		Flow flow = connector.connect(source, output, new Pipe("convert"));
 		flow.complete();
 
 		FileAssert.assertEquals(new File(hcatResultFields),
-				new File(resultPath + "part-00000"));
+				new File(resultPath + "testDataInWithSouceFields/part-00000"));
 	}
 	
 	@Test(expected = PlannerException.class)
 	public void testDataInWithInvalidSouceFields() {
 		HCatTap source = new HCatTap("sample_07", new Fields("a", "b"));
-		Lfs output = new Lfs(new TextDelimited(false, "|"), resultPath,
+		Lfs output = new Lfs(new TextDelimited(false, "|"), resultPath + "testDataInWithInvalidSouceFields",
 				SinkMode.REPLACE);
 
 		Flow flow = connector.connect(source, output, new Pipe("convert"));
@@ -180,7 +128,7 @@ public class HCatTapTest {
     @Test
     public void testOrcInOut() throws IOException {
         HCatTap source = new HCatTap("test_orc");
-        HCatTap output = new HCatTap("test_orc", "output/");
+        HCatTap output = new HCatTap("test_orc", resultPath + "testOrcInOut");
         Pipe pipe = new Pipe("testOrc");
         pipe = new Each(pipe, new Fields("col1"), new ExpressionFilter("col1 > 3", Integer.TYPE));
         Flow flow = connector.connect(source, output, pipe);
@@ -207,13 +155,13 @@ public class HCatTapTest {
 
         List<String> location = CascadingHCatUtil.getDataStorageLocation(
                 MetaStoreUtils.DEFAULT_DATABASE_NAME, "test_orc", null, (JobConf) flow.getFlowProcess().getConfigCopy());
-        assertEquals(location.get(0), resultPath);
+        assertEquals(location.get(0), resultPath + "testOrcInOut");
     }
 
     @Test
     public void testParquetIn() throws IOException {
         HCatTap source = new HCatTap("test_parquet");
-        Lfs output = new Lfs(new TextDelimited(false, "|"), resultPath, SinkMode.REPLACE);
+        Lfs output = new Lfs(new TextDelimited(false, "|"), resultPath + "testParquetIn", SinkMode.REPLACE);
         Pipe pipe = new Pipe("testParquet");
         pipe = new Each(pipe, new Fields("col1"), new ExpressionFilter("col1 != 1", Integer.TYPE));
         Flow flow = connector.connect(source, output, pipe);
