@@ -31,6 +31,8 @@ package cascading.hcatalog;
 import cascading.cascade.CascadeException;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
@@ -52,6 +54,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+
+import static com.google.common.collect.Lists.newArrayList;
 
 /**
  * 
@@ -93,7 +97,7 @@ public class CascadingHCatUtil {
 						// something
 						// like ds >= 1234
 						for (Partition part : parts) {
-							locations.add(part.getSd().getLocation());
+							locations.addAll(getFilesInHivePartition(part, jobConf));
 						}
 					} else {
 						logError("Table " + hiveTable.getTableName()
@@ -123,7 +127,26 @@ public class CascadingHCatUtil {
 
 		return locations;
 	}
-	
+
+    protected static List<String> getFilesInHivePartition(Partition part, JobConf jobConf) {
+        List<String> result = newArrayList();
+
+        try {
+            Path partitionDirPath = new Path(part.getSd().getLocation());
+            FileStatus[] partitionContent = partitionDirPath.getFileSystem(jobConf).listStatus(partitionDirPath);
+            for(FileStatus currStatus : partitionContent) {
+                if(!currStatus.isDir()) {
+                    result.add(currStatus.getPath().toUri().getPath());
+                }
+            }
+
+        } catch (IOException e) {
+            logError("Unable to read the content of partition '" + part.getSd().getLocation() + "'", e);
+        }
+
+        return result;
+    }
+
 	/**
 	 * 
 	 * @param db
