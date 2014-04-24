@@ -54,6 +54,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import static com.google.common.collect.Lists.newArrayList;
 
@@ -63,7 +64,7 @@ import static com.google.common.collect.Lists.newArrayList;
  * 
  */
 public class CascadingHCatUtil {
-	private static final Logger LOG = LoggerFactory
+    private static final Logger LOG = LoggerFactory
 			.getLogger(CascadingHCatUtil.class);
 
 	/**
@@ -128,12 +129,19 @@ public class CascadingHCatUtil {
     protected static List<String> getFilesInHivePartition(Partition part, JobConf jobConf) {
         List<String> result = newArrayList();
 
+        String ignoreFileRegex = jobConf.get("hive-tap.path.partition.file.ignore-regex", "");
+        Pattern ignoreFilePattern = Pattern.compile(ignoreFileRegex);
+
         try {
             Path partitionDirPath = new Path(part.getSd().getLocation());
             FileStatus[] partitionContent = partitionDirPath.getFileSystem(jobConf).listStatus(partitionDirPath);
             for(FileStatus currStatus : partitionContent) {
                 if(!currStatus.isDir()) {
-                    result.add(currStatus.getPath().toUri().getPath());
+                    if(!ignoreFilePattern.matcher(currStatus.getPath().getName()).matches()) {
+                        result.add(currStatus.getPath().toUri().getPath());
+                    } else {
+                        LOG.debug("Ignoring path {} since matches ignore regex {}", currStatus.getPath().toUri().getPath(), ignoreFileRegex);
+                    }
                 }
             }
 

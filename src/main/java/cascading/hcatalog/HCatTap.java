@@ -65,7 +65,9 @@ import java.util.List;
  */
 @SuppressWarnings("serial")
 public class HCatTap extends Tap<JobConf, RecordReader, OutputCollector> {
-	/** Field LOG */
+    public static final String IGNORE_FILE_IN_PARTITION_REGEX = "hive-tap.path.partition.file.ignore-regex";
+
+    /** Field LOG */
 	private static final Logger LOG = LoggerFactory.getLogger(HCatTap.class);
 
 	private String db;
