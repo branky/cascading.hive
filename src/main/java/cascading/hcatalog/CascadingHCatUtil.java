@@ -129,7 +129,7 @@ public class CascadingHCatUtil {
     protected static List<String> getFilesInHivePartition(Partition part, JobConf jobConf) {
         List<String> result = newArrayList();
 
-        String ignoreFileRegex = jobConf.get("hive-tap.path.partition.file.ignore-regex", "");
+        String ignoreFileRegex = jobConf.get(HCatTap.IGNORE_FILE_IN_PARTITION_REGEX, "");
         Pattern ignoreFilePattern = Pattern.compile(ignoreFileRegex);
 
         try {
