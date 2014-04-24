@@ -86,35 +86,32 @@ public class CascadingHCatUtil {
 			Table hiveTable = HCatUtil.getTable(client, db, table);
 
 			// Partition is required
-			if (null != StringUtils.stripToNull(filter)) {
-				if (hiveTable.getPartitionKeys().size() != 0) {
-					// Partitioned table
-					List<Partition> parts = client.listPartitionsByFilter(db,
-							table, filter, (short) -1);
+            if (hiveTable.getPartitionKeys().size() != 0) {
+                List<Partition> parts = null;
+                if (null != StringUtils.stripToNull(filter)) {
+                    parts = client.listPartitionsByFilter(db, table, filter, (short) -1);
+                } else {
+                    parts = client.listPartitions(db, table, (short)-1);
+                }
 
-					if (parts.size() > 0) {
-						// Return more than one partitions when filter is
-						// something
-						// like ds >= 1234
-						for (Partition part : parts) {
-							locations.addAll(getFilesInHivePartition(part, jobConf));
-						}
-					} else {
-						logError("Table " + hiveTable.getTableName()
-								+ " doesn't have the specified partition:"
-								+ filter, null);
-					}
-				} else {
-					logError(
-							"Table " + hiveTable.getTableName()
-									+ " doesn't have the specified partition:"
-									+ filter, null);
-				}
-			} else {
-				locations.add(hiveTable.getTTable().getSd().getLocation());
-			}
-		} catch (IOException e) {
-			logError("Error occured when getting hiveconf", e);
+                if (parts.size() > 0) {
+                    // Return more than one partitions when filter is
+                    // something
+                    // like ds >= 1234
+                    for (Partition part : parts) {
+                        locations.addAll(getFilesInHivePartition(part, jobConf));
+                    }
+                } else {
+                    logError("Table " + hiveTable.getTableName()
+                            + " doesn't have the specified partition:"
+                            + filter, null);
+                }
+
+            } else {
+                locations.add(hiveTable.getTTable().getSd().getLocation());
+            }
+        } catch (IOException e) {
+            logError("Error occured when getting hiveconf", e);
 		} catch (MetaException e) {
 			logError("Error occured when getting HiveMetaStoreClient", e);
 		} catch (NoSuchObjectException e) {
