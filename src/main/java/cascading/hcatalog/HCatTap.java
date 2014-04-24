@@ -43,6 +43,7 @@
 package cascading.hcatalog;
 
 import cascading.flow.FlowProcess;
+import cascading.scheme.Scheme;
 import cascading.tap.SinkMode;
 import cascading.tap.Tap;
 import cascading.tuple.Fields;
@@ -115,8 +116,10 @@ public class HCatTap extends Tap<JobConf, RecordReader, OutputCollector> {
 	 * @param sinkMode 
 	 */
 	public HCatTap(String db, String table, String filter,
-			HCatScheme hCatScheme, String path, Fields sourceField,
-			SinkMode sinkMode) {
+                   Scheme<JobConf,RecordReader,OutputCollector,?,?> hCatScheme,
+                   String path,
+                   Fields sourceField,
+			       SinkMode sinkMode) {
 		super(hCatScheme, sinkMode);
 
 		// Use the default scheme if it is null
