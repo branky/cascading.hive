@@ -86,8 +86,7 @@ public class CascadingHCatUtil {
 			client = getHiveMetaStoreClient(jobConf);
 			Table hiveTable = HCatUtil.getTable(client, db, table);
 
-			// Partition is required
-            if (hiveTable.getPartitionKeys().size() != 0) {
+            if (hiveTable.isPartitioned()) {
                 List<Partition> parts = null;
                 if (null != StringUtils.stripToNull(filter)) {
                     parts = client.listPartitionsByFilter(db, table, filter, (short) -1);
