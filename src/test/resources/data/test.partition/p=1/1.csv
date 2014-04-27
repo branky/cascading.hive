@@ -1,0 +1,165 @@
+00-0000	All Occupations	134354250	40690
+11-0000	Management occupations	6003930	96150
+11-1011	Chief executives	299160	151370
+11-1021	General and operations managers	1655410	103780
+11-1031	Legislators	61110	33880
+11-2011	Advertising and promotions managers	36300	91100
+11-2021	Marketing managers	165240	113400
+11-2022	Sales managers	322170	106790
+11-2031	Public relations managers	47210	97170
+11-3011	Administrative services managers	239360	76370
+11-3021	Computer and information systems managers	264990	113880
+11-3031	Financial managers	484390	106200
+11-3041	Compensation and benefits managers	41780	88400
+11-3042	Training and development managers	28170	90300
+11-3049	Human resources managers, all other	58100	99810
+11-3051	Industrial production managers	152870	87550
+11-3061	Purchasing managers	65600	90430
+11-3071	Transportation, storage, and distribution managers	92790	81980
+11-9011	Farm, ranch, and other agricultural managers	3480	61030
+11-9012	Farmers and ranchers	340	42480
+11-9021	Construction managers	216120	85830
+11-9031	Education administrators, preschool and child care center/program	47980	44430
+11-9032	Education administrators, elementary and secondary school	218820	82120
+11-9033	Education administrators, postsecondary	101160	85870
+11-9039	Education administrators, all other	28640	74230
+11-9041	Engineering managers	184410	115610
+11-9051	Food service managers	191460	48660
+11-9061	Funeral directors	24020	57660
+11-9071	Gaming managers	3740	69600
+11-9081	Lodging managers	31890	51140
+11-9111	Medical and health services managers	242640	84980
+11-9121	Natural sciences managers	39370	113170
+11-9131	Postmasters and mail superintendents	26500	57850
+11-9141	Property, real estate, and community association managers	159660	53530
+11-9151	Social and community service managers	112330	59070
+11-9199	Managers, all other	356690	91990
+13-0000	Business and financial operations occupations	6015500	62410
+13-1011	Agents and business managers of artists, performers, and athletes	11680	82730
+13-1021	Purchasing agents and buyers, farm products	12930	53980
+13-1022	Wholesale and retail buyers, except farm products	132550	53580
+13-1023	Purchasing agents, except wholesale, retail, and farm products	281950	56060
+13-1031	Claims adjusters, examiners, and investigators	279400	55470
+13-1032	Insurance appraisers, auto damage	12150	52020
+13-1041	Compliance officers, except agriculture, construction, health and safety, and transportation	231910	52740
+13-1051	Cost estimators	219070	58640
+13-1061	Emergency management specialists	11610	51470
+13-1071	Employment, recruitment, and placement specialists	193620	52710
+13-1072	Compensation, benefits, and job analysis specialists	109870	55740
+13-1073	Training and development specialists	202820	53040
+13-1079	Human resources, training, and labor relations specialists, all other	211770	56740
+13-1081	Logisticians	90340	66240
+13-1111	Management analysts	499640	80460
+13-1121	Meeting and convention planners	45490	47180
+13-1199	Business operations specialists, all other	1017640	62140
+13-2011	Accountants and auditors	1115010	63180
+13-2021	Appraisers and assessors of real estate	66210	52290
+13-2031	Budget analysts	62400	66310
+13-2041	Credit analysts	70890	62820
+13-2051	Financial analysts	228300	81700
+13-2052	Personal financial advisors	132460	89220
+13-2053	Insurance underwriters	98920	60120
+13-2061	Financial examiners	25510	73550
+13-2071	Loan counselors	30150	41990
+13-2072	Loan officers	356990	62610
+13-2081	Tax examiners, collectors, and revenue agents	65750	51510
+13-2082	Tax preparers	61890	34890
+13-2099	Financial specialists, all other	136570	61760
+15-0000	Computer and mathematical occupations	3191360	72190
+15-1011	Computer and information scientists, research	28720	100640
+15-1021	Computer programmers	394710	72010
+15-1031	Computer software engineers, applications	495810	85660
+15-1032	Computer software engineers, systems software	349140	90780
+15-1041	Computer support specialists	525570	45300
+15-1051	Computer systems analysts	464440	75890
+15-1061	Database administrators	116340	70260
+15-1071	Network and computer systems administrators	309660	67850
+15-1081	Network systems and data communications analysts	216050	70760
+15-1099	Computer specialists, all other	182690	72310
+15-2011	Actuaries	18030	95420
+15-2021	Mathematicians	3160	90930
+15-2031	Operations research analysts	58750	71640
+15-2041	Statisticians	20270	72150
+15-2091	Mathematical technicians	1080	48490
+15-2099	Mathematical scientists, all other	6930	61100
+17-0000	Architecture and engineering occupations	2486020	68880
+17-1011	Architects, except landscape and naval	106830	73650
+17-1012	Landscape architects	21890	62250
+17-1021	Cartographers and photogrammetrists	11460	54480
+17-1022	Surveyors	56670	54450
+17-2011	Aerospace engineers	85510	92700
+17-2021	Agricultural engineers	2480	70460
+17-2031	Biomedical engineers	15400	79610
+17-2041	Chemical engineers	28780	84240
+17-2051	Civil engineers	247370	75230
+17-2061	Computer hardware engineers	79330	94270
+17-2071	Electrical engineers	148800	82090
+17-2072	Electronics engineers, except computer	133870	85550
+17-2081	Environmental engineers	51210	74820
+17-2111	Health and safety engineers, except mining safety engineers and inspectors	24770	70970
+17-2112	Industrial engineers	204210	73490
+17-2121	Marine engineers and naval architects	6620	78200
+17-2131	Materials engineers	21910	78840
+17-2141	Mechanical engineers	222330	75130
+17-2151	Mining and geological engineers, including mining safety engineers	7150	79520
+17-2161	Nuclear engineers	14300	97130
+17-2171	Petroleum engineers	16060	113890
+17-2199	Engineers, all other	169950	85430
+17-3011	Architectural and civil drafters	111460	45280
+17-3012	Electrical and electronics drafters	32350	51710
+17-3013	Mechanical drafters	74260	46690
+17-3019	Drafters, all other	23280	47340
+17-3021	Aerospace engineering and operations technicians	7870	56780
+17-3022	Civil engineering technicians	88030	43890
+17-3023	Electrical and electronic engineering technicians	162460	52470
+17-3024	Electro-mechanical technicians	15730	48120
+17-3025	Environmental engineering technicians	21970	43570
+17-3026	Industrial engineering technicians	74930	51410
+17-3027	Mechanical engineering technicians	46230	49290
+17-3029	Engineering technicians, except drafters, all other	78140	55730
+17-3031	Surveying and mapping technicians	72410	35900
+19-0000	Life, physical, and social science occupations	1255670	62020
+19-1011	Animal scientists	4210	54290
+19-1012	Food scientists and technologists	9910	62580
+19-1013	Soil and plant scientists	10270	62970
+19-1021	Biochemists and biophysicists	19490	85290
+19-1022	Microbiologists	14610	66430
+19-1023	Zoologists and wildlife biologists	17830	58480
+19-1029	Biological scientists, all other	27070	66240
+19-1031	Conservation scientists	16570	57220
+19-1032	Foresters	10510	54030
+19-1041	Epidemiologists	3960	63600
+19-1042	Medical scientists, except epidemiologists	87440	74160
+19-1099	Life scientists, all other	12470	66930
+19-2011	Astronomers	1520	98200
+19-2012	Physicists	13980	99900
+19-2021	Atmospheric and space scientists	8750	78960
+19-2031	Chemists	79860	68520
+19-2032	Materials scientists	9740	77930
+19-2041	Environmental scientists and specialists, including health	80070	63870
+19-2042	Geoscientists, except hydrologists and geographers	31390	84100
+19-2043	Hydrologists	7670	70250
+19-2099	Physical scientists, all other	23300	88210
+19-3011	Economists	12740	86700
+19-3021	Market research analysts	220740	66980
+19-3022	Survey researchers	22140	42880
+19-3031	Clinical, counseling, and school psychologists	95120	68150
+19-3032	Industrial-organizational psychologists	1240	86610
+19-3039	Psychologists, all other	9470	83610
+19-3041	Sociologists	3680	67330
+19-3051	Urban and regional planners	35040	60480
+19-3091	Anthropologists and archeologists	5250	55490
+19-3092	Geographers	1010	66440
+19-3093	Historians	3600	54630
+19-3094	Political scientists	3940	90050
+19-3099	Social scientists and related workers, all other	30410	69720
+19-4011	Agricultural and food science technicians	19280	35520
+19-4021	Biological technicians	69110	40240
+19-4031	Chemical technicians	64450	42420
+19-4041	Geological and petroleum technicians	13060	55330
+19-4051	Nuclear technicians	5920	65850
+19-4061	Social science research assistants	16070	38120
+19-4091	Environmental science and protection technicians, including health	33950	42190
+19-4092	Forensic science technicians	12030	50310
+19-4093	Forest and conservation technicians	26900	35770
+19-4099	Life, physical, and social science technicians, all other	59910	41230
