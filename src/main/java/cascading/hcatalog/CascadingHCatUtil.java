@@ -31,6 +31,8 @@ package cascading.hcatalog;
 import cascading.cascade.CascadeException;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
@@ -52,6 +54,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
+
+import static com.google.common.collect.Lists.newArrayList;
 
 /**
  * 
@@ -59,7 +64,7 @@ import java.util.List;
  * 
  */
 public class CascadingHCatUtil {
-	private static final Logger LOG = LoggerFactory
+    private static final Logger LOG = LoggerFactory
 			.getLogger(CascadingHCatUtil.class);
 
 	/**
@@ -81,36 +86,32 @@ public class CascadingHCatUtil {
 			client = getHiveMetaStoreClient(jobConf);
 			Table hiveTable = HCatUtil.getTable(client, db, table);
 
-			// Partition is required
-			if (null != StringUtils.stripToNull(filter)) {
-				if (hiveTable.getPartitionKeys().size() != 0) {
-					// Partitioned table
-					List<Partition> parts = client.listPartitionsByFilter(db,
-							table, filter, (short) -1);
+            if (hiveTable.isPartitioned()) {
+                List<Partition> parts = null;
+                if (null != StringUtils.stripToNull(filter)) {
+                    parts = client.listPartitionsByFilter(db, table, filter, (short) -1);
+                } else {
+                    parts = client.listPartitions(db, table, (short)-1);
+                }
 
-					if (parts.size() > 0) {
-						// Return more than one partitions when filter is
-						// something
-						// like ds >= 1234
-						for (Partition part : parts) {
-							locations.add(part.getSd().getLocation());
-						}
-					} else {
-						logError("Table " + hiveTable.getTableName()
-								+ " doesn't have the specified partition:"
-								+ filter, null);
-					}
-				} else {
-					logError(
-							"Table " + hiveTable.getTableName()
-									+ " doesn't have the specified partition:"
-									+ filter, null);
-				}
-			} else {
-				locations.add(hiveTable.getTTable().getSd().getLocation());
-			}
-		} catch (IOException e) {
-			logError("Error occured when getting hiveconf", e);
+                if (parts.size() > 0) {
+                    // Return more than one partitions when filter is
+                    // something
+                    // like ds >= 1234
+                    for (Partition part : parts) {
+                        locations.addAll(getFilesInHivePartition(part, jobConf));
+                    }
+                } else {
+                    logError("Table " + hiveTable.getTableName()
+                            + " doesn't have the specified partition:"
+                            + filter, null);
+                }
+
+            } else {
+                locations.add(hiveTable.getTTable().getSd().getLocation());
+            }
+        } catch (IOException e) {
+            logError("Error occured when getting hiveconf", e);
 		} catch (MetaException e) {
 			logError("Error occured when getting HiveMetaStoreClient", e);
 		} catch (NoSuchObjectException e) {
@@ -123,7 +124,33 @@ public class CascadingHCatUtil {
 
 		return locations;
 	}
-	
+
+    protected static List<String> getFilesInHivePartition(Partition part, JobConf jobConf) {
+        List<String> result = newArrayList();
+
+        String ignoreFileRegex = jobConf.get(HCatTap.IGNORE_FILE_IN_PARTITION_REGEX, "");
+        Pattern ignoreFilePattern = Pattern.compile(ignoreFileRegex);
+
+        try {
+            Path partitionDirPath = new Path(part.getSd().getLocation());
+            FileStatus[] partitionContent = partitionDirPath.getFileSystem(jobConf).listStatus(partitionDirPath);
+            for(FileStatus currStatus : partitionContent) {
+                if(!currStatus.isDir()) {
+                    if(!ignoreFilePattern.matcher(currStatus.getPath().getName()).matches()) {
+                        result.add(currStatus.getPath().toUri().getPath());
+                    } else {
+                        LOG.debug("Ignoring path {} since matches ignore regex {}", currStatus.getPath().toUri().getPath(), ignoreFileRegex);
+                    }
+                }
+            }
+
+        } catch (IOException e) {
+            logError("Unable to read the content of partition '" + part.getSd().getLocation() + "'", e);
+        }
+
+        return result;
+    }
+
 	/**
 	 * 
 	 * @param db

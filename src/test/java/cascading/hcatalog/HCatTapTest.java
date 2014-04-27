@@ -32,6 +32,7 @@ import cascading.flow.Flow;
 import cascading.flow.FlowConnector;
 import cascading.flow.hadoop.HadoopFlowConnector;
 import cascading.flow.planner.PlannerException;
+import cascading.hive.RCFile;
 import cascading.operation.Identity;
 import cascading.operation.expression.ExpressionFilter;
 import cascading.pipe.Each;
@@ -60,6 +61,7 @@ import static org.junit.Assert.assertTrue;
 public class HCatTapTest {
 	private FlowConnector connector;
 	private String hcatOut;
+	private String hcatRcOut;
 	private String hcatIn;
 	private String hcatResultFields;
 	private String resultPath;
@@ -68,6 +70,7 @@ public class HCatTapTest {
 	public void setUp() throws Exception {
 		connector = new HadoopFlowConnector(new Properties());
 		hcatOut = "src/test/resources/data/hcatout.txt";
+		hcatRcOut = "src/test/resources/data/test.rc.txt";
 		hcatIn = "src/test/resources/data/sample_07.csv";
 		hcatResultFields = "src/test/resources/data/hcat_result_fields.txt";
 		resultPath = "output/";
@@ -178,5 +181,31 @@ public class HCatTapTest {
             Tuple actual = it.next().getTuple();
             assertEquals(expected[i++], actual);
         }
+    }
+
+    @Test
+    public void testPartitionsIn() throws IOException {
+        HCatTap source = new HCatTap("test_partition");
+        Lfs output = new Lfs(new TextDelimited(false, "|"), resultPath + "testPartitionsIn",
+                SinkMode.REPLACE);
+        Each pipe = new Each("test", new Identity(new Fields("code", "description", "total_emp", "salary")));
+        Flow flow = connector.connect(source, output, pipe);
+        flow.complete();
+
+        FileAssert.assertEquals(new File(hcatOut),
+                new File(resultPath + "testPartitionsIn/part-00000"));
+    }
+
+    @Test
+    public void testPartitionsInWithExternallyProvidedSchema() throws IOException {
+        HCatTap source = new HCatTap(null, "test_partition_rc", null, new RCFile("col1 int, col2 string, col3 string"), null, null, SinkMode.REPLACE);
+        Lfs output = new Lfs(new TextDelimited(false, "|"), resultPath + "testPartitionsIn",
+                SinkMode.REPLACE);
+        Each pipe = new Each("test", new Identity(new Fields("col1", "col2", "col3")));
+        Flow flow = connector.connect(source, output, pipe);
+        flow.complete();
+
+        FileAssert.assertEquals(new File(hcatRcOut),
+                new File(resultPath + "testPartitionsIn/part-00000"));
     }
 }

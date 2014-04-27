@@ -43,6 +43,7 @@
 package cascading.hcatalog;
 
 import cascading.flow.FlowProcess;
+import cascading.scheme.Scheme;
 import cascading.tap.SinkMode;
 import cascading.tap.Tap;
 import cascading.tuple.Fields;
@@ -65,7 +66,9 @@ import java.util.List;
  */
 @SuppressWarnings("serial")
 public class HCatTap extends Tap<JobConf, RecordReader, OutputCollector> {
-	/** Field LOG */
+    public static final String IGNORE_FILE_IN_PARTITION_REGEX = "hive-tap.path.partition.file.ignore-regex";
+
+    /** Field LOG */
 	private static final Logger LOG = LoggerFactory.getLogger(HCatTap.class);
 
 	private String db;
@@ -113,8 +116,10 @@ public class HCatTap extends Tap<JobConf, RecordReader, OutputCollector> {
 	 * @param sinkMode 
 	 */
 	public HCatTap(String db, String table, String filter,
-			HCatScheme hCatScheme, String path, Fields sourceField,
-			SinkMode sinkMode) {
+                   Scheme<JobConf,RecordReader,OutputCollector,?,?> hCatScheme,
+                   String path,
+                   Fields sourceField,
+			       SinkMode sinkMode) {
 		super(hCatScheme, sinkMode);
 
 		// Use the default scheme if it is null

@@ -93,7 +93,7 @@ public class DefaultHCatScheme extends HCatScheme {
 	@Override
 	protected HCatSchema getTableHCatSchema(Table table, String filter,
 			JobConf conf) {
-		return CascadingHCatUtil.buildHCatSchema(table.getAllCols());
+		return CascadingHCatUtil.buildHCatSchema(table.getCols());
 	}
 
 	/*
