@@ -15,7 +15,7 @@ Maven dependency
 <dependency>
   <groupId>com.ebay</groupId>
   <artifactId>cascading-hive</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.0.1</version>
   <scope>compile</scope>
 </dependency> 
 ```
