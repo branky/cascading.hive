@@ -129,6 +129,7 @@
 			<groupId>com.twitter</groupId>
 			<artifactId>scalding-core_${scala.version}</artifactId>
 			<version>${scalding.version}</version>
+            <scope>provided</scope>
 		</dependency>
         <dependency>
             <groupId>com.google.protobuf</groupId>

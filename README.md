@@ -15,7 +15,7 @@ Maven dependency
 <dependency>
   <groupId>com.ebay</groupId>
   <artifactId>cascading-hive</artifactId>
-  <version>0.0.1</version>
+  <version>0.0.2-SNAPSHOT</version>
   <scope>compile</scope>
 </dependency> 
 ```
@@ -57,7 +57,11 @@ To talk with your production HCatalog, you have to include real hive-site.xml in
 ```
 hadoop jar $your_fat_jar -libjars $HIVE_HOME/lib/datanucleus-core-3.2.2.jar,$HIVE_HOME/lib/datanucleus-rdbms-3.2.1.jar,$HIVE_HOME/lib/datanucleus-api-jdo-3.2.2.jar $your_options
 ```
- 
+
+Scalding usage
+--------------
+To use RCFile/ORC with Scalding, check out [ColumnarSerDeSource.scala](https://github.com/branky/cascading.hive/blob/master/src/main/scala/com/twitter/scalding/ColumnarSerDeSource.scala). It requires Scalding 0.9.1.
+
 
 
 
