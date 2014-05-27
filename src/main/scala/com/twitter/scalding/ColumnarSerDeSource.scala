@@ -28,7 +28,7 @@ trait ColumnarSerDeScheme extends SchemedSource {
     //
     // Return:
     //   @columnTypes plus any missing values set to @defaultType
-    def typeNames:List[String] = columnTypes ++ List.fill(columns.size)(defaultType)
+    def typeNames:List[String] = columnTypes ++ List.fill(columns.size)(defaultType) take(columns.size)
 }
 
 ////
