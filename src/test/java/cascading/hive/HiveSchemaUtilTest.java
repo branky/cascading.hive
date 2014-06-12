@@ -76,7 +76,7 @@ public class HiveSchemaUtilTest {
     List<String> expectedNames = new ArrayList<String>(4);
     expectedNames.add("complex");
     List<String> expectedTypes = new ArrayList<String>(4);
-    expectedTypes.add("array");
+    expectedTypes.add("array<string>");
 
     assertEquals(expectedNames, nameList);
     assertEquals(expectedTypes, typeList);

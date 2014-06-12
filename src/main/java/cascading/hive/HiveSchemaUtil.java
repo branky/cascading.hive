@@ -67,8 +67,8 @@ public class HiveSchemaUtil {
     } catch (SemanticException e) {
       throw new RuntimeException("malformed <name/type> pair found: " + e.getMessage());
     }
-    ArrayList<String> names = new ArrayList<>();
-    ArrayList<String> types = new ArrayList<>();
+    ArrayList<String> names = new ArrayList<String>();
+    ArrayList<String> types = new ArrayList<String>();
     ArrayList[] ret = new ArrayList[] {names, types};
 
     for (FieldSchema fs : list) {
