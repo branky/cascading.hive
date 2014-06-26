@@ -18,16 +18,27 @@ import cascading.flow.FlowProcess;
 import cascading.scheme.Scheme;
 import cascading.scheme.SinkCall;
 import cascading.scheme.SourceCall;
+import cascading.tap.CompositeTap;
 import cascading.tap.Tap;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
+import cascading.tuple.TupleEntry;
+
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.ql.io.orc.*;
+
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
+import org.apache.hadoop.hive.serde2.objectinspector.StructField;
+import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
@@ -36,7 +47,9 @@ import org.apache.hadoop.mapred.RecordReader;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -58,7 +71,23 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
     private transient OrcSerde serde;
 
     private HashMap<String, Type> typeMapping = new HashMap<String, Type>(10);
-
+    
+    private static final PathFilter filter = new PathFilter() {
+        @Override
+        public boolean accept(Path path) {
+            return !path.getName().startsWith("_");
+        }
+    };
+    static final String DEFAULT_COL_PREFIX = "_col";
+    
+    /**
+     * Construct an instance of ORCFile without specifying field names or
+     * types. Infer struct info from ORC file or Cascading planner
+     * 
+     * */
+    public ORCFile() {
+        this(null);
+    }
 
     /**Construct an instance of ORCFile using specified array of field names and types.
      * @param names field names
@@ -89,14 +118,18 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
      * @param hiveScheme hive table scheme
      * @param selectedColIds a list of column ids (started from 0) to explicitly specify which columns will be used
      */
-    public ORCFile(String hiveScheme, String selectedColIds) {
-        ArrayList<String>[] lists = HiveSchemaUtil.parse(hiveScheme);
-        Fields fields = new Fields(lists[0].toArray(new String[lists[0].size()]));
-        setSinkFields(fields);
-        setSourceFields(fields);
-        this.types = lists[1].toArray(new String[lists[1].size()]);
+    public ORCFile(String hiveScheme, String selectedColIds) {        
+        if (hiveScheme != null) {
+            ArrayList<String>[] lists = HiveSchemaUtil.parse(hiveScheme);
+            Fields fields = new Fields(lists[0].toArray(new String[lists[0].size()]));
+            setSinkFields(fields);
+            setSourceFields(fields);
+            this.types = lists[1].toArray(new String[lists[1].size()]);
+            
+            validate();
+        }
+        
         this.selectedColIds = selectedColIds;
-        validate();
         initTypeMapping();
     }
 
@@ -135,6 +168,100 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
         typeMapping.put("boolean", Type.BOOLEAN);
     }
 
+    private void inferSchema(FlowProcess<JobConf> flowProcess, Tap tap) throws IOException {
+        if (tap instanceof CompositeTap) {
+            tap = (Tap) ((CompositeTap) tap).getChildTaps().next();
+        }
+        final String path = tap.getIdentifier();
+        Path p = new Path(path);
+        final FileSystem fs = p.getFileSystem(flowProcess.getConfigCopy());
+        // Get all the input dirs
+        List<FileStatus> statuses = new LinkedList<FileStatus>(Arrays.asList(fs.globStatus(p, filter)));
+        // Now get all the things that are one level down
+        for (FileStatus status : new LinkedList<FileStatus>(statuses)) {
+            if (status.isDir())
+                for (FileStatus child : Arrays.asList(fs.listStatus(status.getPath(), filter))) {
+                    if (child.isDir()) {
+                        statuses.addAll(Arrays.asList(fs.listStatus(child.getPath(), filter)));
+                    } else if (fs.isFile(child.getPath())) {
+                        statuses.add(child);
+                    }
+                }
+        }
+        for (FileStatus status : statuses) {
+            Path statusPath = status.getPath();
+            if (fs.isFile(statusPath)) {
+                Reader reader = OrcFile.createReader(fs, statusPath);
+                StructObjectInspector soi = (StructObjectInspector) reader.getObjectInspector();
+                extractSourceFields(soi);
+            }
+        }
+    }
+    
+    private int[] parseColIds(String selectedColIds) {
+        String[] items = selectedColIds.split(",");
+        int[] ids = new int[items.length];
+        for (int i = 0; i < items.length; i++) {
+            ids[i] = Integer.valueOf(items[i]);
+        }
+        
+        return ids;
+    }
+    
+    private void extractSourceFields(StructObjectInspector soi) {
+        List<? extends StructField> fields = soi.getAllStructFieldRefs();
+//        int[] colIds;
+//        if (selectedColIds != null) {
+//            colIds = parseColIds(selectedColIds);
+//        } else {
+//            colIds = new int[fields.size()];
+//            for (int i = 0; i < fields.size(); i++) {
+//                colIds[i] = i;
+//            }
+//        }
+        
+        int[] colIds = new int[fields.size()];
+        for (int i = 0; i < fields.size(); i++) {
+            colIds[i] = i;
+        }
+        
+        types = new String[colIds.length];
+        Fields srcFields = new Fields();
+        for (int i = 0; i < types.length; i++) {
+            types[i] = fields.get(colIds[i]).getFieldObjectInspector().getTypeName();
+            if (types[i].startsWith(PrimitiveCategory.DECIMAL.name().toLowerCase())) {
+                types[i] = Type.BIGDECIMAL.name().toLowerCase();
+            }
+            srcFields = srcFields.append(new Fields(fields.get(colIds[i]).getFieldName()));
+        }
+        setSourceFields(srcFields);
+    }
+    
+    /**
+     * Method retrieveSourceFields notifies a Scheme when it is appropriate to dynamically
+     * update the fields it sources. Schema will be inferred if type info is not specified
+     * <p/>
+     * The {@code FlowProcess} presents all known properties resolved by the current planner.
+     * <p/>
+     * The {@code tap} instance is the parent {@link Tap} for this Scheme instance.
+     *
+     * @param flowProcess of type FlowProcess
+     * @param tap         of type Tap
+     * @return Fields
+     */
+    @Override
+    public Fields retrieveSourceFields(FlowProcess<JobConf> flowProcess, Tap tap) {
+        if (types == null) {    // called by planner
+            try {
+                inferSchema(flowProcess, tap);
+                validate();
+            } catch (Exception e) {
+                throw new RuntimeException("error inferring schema from input: " + tap.getIdentifier(), e);
+            }
+        }
+     
+        return getSourceFields();
+    }
 
     @Override
     public void sourcePrepare(FlowProcess<JobConf> flowProcess, SourceCall<Object[], RecordReader> sourceCall ) throws IOException {
@@ -162,6 +289,15 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
         if (selectedColIds != null) {
             conf.set(HiveProps.HIVE_SELECTD_COLUMN_IDS, selectedColIds);
             conf.set(HiveProps.HIVE_READ_ALL_COLUMNS, "false");
+        }
+        
+        if (types == null) {    // never initialized by the planner
+            try {
+                inferSchema(flowProcess, tap);
+                validate();
+            } catch (Exception e) {
+                throw new RuntimeException("error inferring schema from input: " + tap.getIdentifier(), e);
+            }
         }
     }
 
@@ -227,8 +363,14 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
             serde = new OrcSerde();
         }
         sinkCall.setContext(new Object[2]);
-        sinkCall.getContext()[0] = new OrcStruct(getSinkFields().size());
-        sinkCall.getContext()[1] = createObjectInspector();
+        if (types != null) {
+            sinkCall.getContext()[0] = new OrcStruct(getSinkFields().size());
+            sinkCall.getContext()[1] = createObjectInspector();
+        } else {    // lazy-initialize since we have no idea about the schema now
+            sinkCall.getContext()[0] = null;
+            sinkCall.getContext()[1] = null;
+        }
+
     }
 
     @Override
@@ -239,11 +381,53 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
 
     @Override
     public void sink(FlowProcess<JobConf> flowProcess, SinkCall<Object[], OutputCollector> sinkCall) throws IOException {
-        Tuple tuple = sinkCall.getOutgoingEntry().getTuple();
+        TupleEntry entry = sinkCall.getOutgoingEntry();
+        if (sinkCall.getContext()[0] == null) { // initialize
+            extractSinkFields(entry);
+            sinkCall.getContext()[0] = new OrcStruct(getSinkFields().size());
+            sinkCall.getContext()[1] = createObjectInspector();
+        }
+        
+        Tuple tuple = entry.getTuple();
         OrcStruct struct = (OrcStruct)sinkCall.getContext()[0];
         tuple2Struct(tuple, struct);
         Writable row = serde.serialize(struct, (ObjectInspector)sinkCall.getContext()[1]);
         sinkCall.getOutput().collect(null, row);
+    }
+    
+    private void extractSinkFields(TupleEntry entry) {
+        Fields fields = entry.getFields();
+        if (fields == Fields.UNKNOWN) {
+            fields = new Fields();
+            for (int i = 0; i < entry.size(); i++) {
+                fields = fields.append(new Fields(DEFAULT_COL_PREFIX + i));
+            }
+        }
+        setSinkFields(fields);
+        
+        types = new String[entry.size()];
+        for (int i = 0; i < entry.size(); i++) {
+            Object o = entry.getObject(i);
+            if (o instanceof Integer) {
+                types[i] = Type.INT.name().toLowerCase();
+            } else if (o instanceof Boolean) {
+                types[i] = Type.BOOLEAN.name().toLowerCase();
+            } else if (o instanceof Byte) {
+                types[i] = Type.TINYINT.name().toLowerCase();
+            } else if (o instanceof Short) {
+                types[i] = Type.SMALLINT.name().toLowerCase();
+            } else if (o instanceof Long) {
+                types[i] = Type.BIGINT.name().toLowerCase();
+            } else if (o instanceof Float) {
+                types[i] = Type.FLOAT.name().toLowerCase();
+            } else if (o instanceof Double) {
+                types[i] = Type.DOUBLE.name().toLowerCase();
+            } else if (o instanceof BigDecimal) {
+                types[i] = Type.BIGDECIMAL.name().toLowerCase();
+            } else {
+                types[i] = Type.STRING.name().toLowerCase();
+            }
+        }
     }
 
     private void tuple2Struct(Tuple tuple, OrcStruct struct) {
@@ -272,8 +456,8 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
                     value = tuple.getObject(i) == null ? null : new DoubleWritable(tuple.getDouble(i));
                     break;
                 case BIGDECIMAL:
-                    value = tuple.getObject(i) == null ? null :
-                            new HiveDecimalWritable(new HiveDecimal(new BigDecimal(tuple.getString(i))));
+                    value = tuple.getObject(i) == null ? null : new HiveDecimalWritable(
+                            HiveDecimal.create(new BigDecimal(tuple.getString(i))));
                     break;
                 case STRING:
                 default:
