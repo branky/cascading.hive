@@ -157,7 +157,7 @@ public class CascadingHCatUtil {
 			client = getHiveMetaStoreClient(jobConf);
 			
 			Table hiveTable = HCatUtil.getTable(client, db, table);
-			hiveTable.setDataLocation(new URI(path));
+			hiveTable.setDataLocation(new Path(path));
 			
 			client.alter_table(db, table, hiveTable.getTTable());
 		} catch (IOException e) {
@@ -168,8 +168,6 @@ public class CascadingHCatUtil {
 			logError("Table doesn't exist in HCatalog: " + table, e);
 		} catch (TException e) {
 			logError("Error occured when getting Table", e);
-		} catch (URISyntaxException e) {
-			logError("Error occured when getting uri from path:" + path, e);
 		} finally {
 			HCatUtil.closeHiveClientQuietly(client);
 		}
