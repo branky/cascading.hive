@@ -285,6 +285,12 @@
                                     <exclude>org.apache.httpcomponents:httpclient</exclude>
                                     <exclude>org.codehaus.jackson:jackson-mapper-asl</exclude>
                                     <exclude>com.google.code.findbugs:jsr305</exclude>
+                                    <exclude>org.apache.ant:ant</exclude>
+                                    <exclude>org.eclipse.jetty.aggregate:jetty-all</exclude>
+                                    <exclude>org.apache.zookeeper:zookeeper</exclude>
+                                    <exclude>jline:jline</exclude>
+                                    <exclude>org.codehaus.groovy:groovy-all</exclude>
+                                    <exclude>org.apache.hive:hive-metastore</exclude>
                                 </excludes>
                             </artifactSet>
                         </configuration>
