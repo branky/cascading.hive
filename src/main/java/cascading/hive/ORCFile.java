@@ -29,20 +29,30 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
-import org.apache.hadoop.hive.ql.io.orc.*;
-
+import org.apache.hadoop.hive.ql.io.orc.OrcFile;
+import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
+import org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat;
+import org.apache.hadoop.hive.ql.io.orc.OrcSerde;
+import org.apache.hadoop.hive.ql.io.orc.OrcStruct;
+import org.apache.hadoop.hive.ql.io.orc.Reader;
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
+import org.apache.hadoop.hive.serde2.objectinspector.SettableStructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.io.*;
+import org.apache.hadoop.mapred.FileOutputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.RecordReader;
+import org.apache.hadoop.mapred.RecordWriter;
+import org.apache.hadoop.util.Progressable;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -198,27 +208,8 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
         }
     }
     
-    private int[] parseColIds(String selectedColIds) {
-        String[] items = selectedColIds.split(",");
-        int[] ids = new int[items.length];
-        for (int i = 0; i < items.length; i++) {
-            ids[i] = Integer.valueOf(items[i]);
-        }
-        
-        return ids;
-    }
-    
     private void extractSourceFields(StructObjectInspector soi) {
         List<? extends StructField> fields = soi.getAllStructFieldRefs();
-//        int[] colIds;
-//        if (selectedColIds != null) {
-//            colIds = parseColIds(selectedColIds);
-//        } else {
-//            colIds = new int[fields.size()];
-//            for (int i = 0; i < fields.size(); i++) {
-//                colIds[i] = i;
-//            }
-//        }
         
         int[] colIds = new int[fields.size()];
         for (int i = 0; i < fields.size(); i++) {
@@ -265,10 +256,11 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
 
     @Override
     public void sourcePrepare(FlowProcess<JobConf> flowProcess, SourceCall<Object[], RecordReader> sourceCall ) throws IOException {
-        sourceCall.setContext(new Object[2]);
+        sourceCall.setContext(new Object[3]);
 
         sourceCall.getContext()[0] = sourceCall.getInput().createKey();
         sourceCall.getContext()[1] = sourceCall.getInput().createValue();
+        sourceCall.getContext()[2] = createObjectInspector(getSourceFields());
     }
 
     @Override
@@ -308,53 +300,70 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
         Tuple tuple = sourceCall.getIncomingEntry().getTuple();
         OrcStruct o = (OrcStruct)sourceCall.getContext()[1];
         tuple.clear();
-        struct2Tuple(o, tuple);
+        struct2Tuple(o, tuple, (ObjectInspector)sourceCall.getContext()[2]);
         return true;
     }
 
-    private void struct2Tuple(OrcStruct struct, Tuple tuple) {
+    private void struct2Tuple(OrcStruct struct, Tuple tuple, ObjectInspector oi) {
         Object value = null;
+        StructObjectInspector soi = (StructObjectInspector) oi;
+        List<Object> values = soi.getStructFieldsDataAsList(struct);
+        
         for (int i = 0; i < types.length; i++) {
             switch(typeMapping.get(types[i].toLowerCase())) {
                 case INT:
-                    value = struct.getFieldValue(i) == null ? null : ((IntWritable)struct.getFieldValue(i)).get();
+                    value =  values.get(i) == null ? null : ((IntWritable) values.get(i)).get();
                     break;
                 case BOOLEAN:
-                    value = struct.getFieldValue(i) == null ? null : ((BooleanWritable)struct.getFieldValue(i)).get();
+                    value =  values.get(i) == null ? null : ((BooleanWritable) values.get(i)).get();
                     break;
                 case TINYINT:
-                    value = struct.getFieldValue(i) == null ? null : ((ByteWritable)struct.getFieldValue(i)).get();
+                    value =  values.get(i) == null ? null : ((ByteWritable) values.get(i)).get();
                     break;
                 case SMALLINT:
-                    value = struct.getFieldValue(i) == null ? null : ((ShortWritable)struct.getFieldValue(i)).get();
+                    value =  values.get(i) == null ? null : ((ShortWritable) values.get(i)).get();
                     break;
                 case BIGINT:
-                    value = struct.getFieldValue(i) == null ? null : ((LongWritable)struct.getFieldValue(i)).get();
+                    value =  values.get(i) == null ? null : ((LongWritable) values.get(i)).get();
                     break;
                 case FLOAT:
-                    value = struct.getFieldValue(i) == null ? null : ((FloatWritable)struct.getFieldValue(i)).get();
+                    value =  values.get(i) == null ? null : ((FloatWritable) values.get(i)).get();
                     break;
                 case DOUBLE:
-                    value = struct.getFieldValue(i) == null ? null : ((DoubleWritable)struct.getFieldValue(i)).get();
+                    value =  values.get(i) == null ? null : ((DoubleWritable) values.get(i)).get();
                     break;
                 case BIGDECIMAL:
-                    value = struct.getFieldValue(i) == null ? null :
-                            ((HiveDecimalWritable)struct.getFieldValue(i)).getHiveDecimal().bigDecimalValue();
+                    value =  values.get(i) == null ? null :
+                            ((HiveDecimalWritable) values.get(i)).getHiveDecimal().bigDecimalValue();
                     break;
                 case STRING:
                 default:
-                    value = struct.getFieldValue(i) == null ? null : struct.getFieldValue(i).toString();
+                    value =  values.get(i) == null ? null :  values.get(i).toString();
             }
 
             tuple.add(value);
+        }
+    }
+    
+    /**
+     * fix the output path issue of OrcOutputFormats
+     */
+    public static class OrcSchemeOutputFormat extends OrcOutputFormat {
+        @Override
+        public RecordWriter getRecordWriter(FileSystem fileSystem,
+                JobConf conf, String name, Progressable reporter)
+                throws IOException {
+            Path file = FileOutputFormat.getTaskOutputPath(conf, name);
+            return super.getRecordWriter(fileSystem, conf, file.toString(),
+                    reporter);
         }
     }
 
     @Override
     public void sinkConfInit(FlowProcess<JobConf> flowProcess, Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
         conf.setOutputKeyClass(NullWritable.class);
-        conf.setOutputValueClass(OrcSerde.OrcSerdeRow.class);
-        conf.setOutputFormat(OrcOutputFormat.class );
+        conf.setOutputValueClass(Writable.class);
+        conf.setOutputFormat(OrcSchemeOutputFormat.class );
     }
 
     @Override
@@ -364,13 +373,15 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
         }
         sinkCall.setContext(new Object[2]);
         if (types != null) {
-            sinkCall.getContext()[0] = new OrcStruct(getSinkFields().size());
-            sinkCall.getContext()[1] = createObjectInspector();
+            SettableStructObjectInspector oi = (SettableStructObjectInspector) createObjectInspector(getSinkFields());
+            OrcStruct struct = (OrcStruct) oi.create();
+            struct.setNumFields(getSinkFields().size());
+            sinkCall.getContext()[0] = struct;
+            sinkCall.getContext()[1] = oi;
         } else {    // lazy-initialize since we have no idea about the schema now
             sinkCall.getContext()[0] = null;
             sinkCall.getContext()[1] = null;
         }
-
     }
 
     @Override
@@ -384,13 +395,16 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
         TupleEntry entry = sinkCall.getOutgoingEntry();
         if (sinkCall.getContext()[0] == null) { // initialize
             extractSinkFields(entry);
-            sinkCall.getContext()[0] = new OrcStruct(getSinkFields().size());
-            sinkCall.getContext()[1] = createObjectInspector();
+            SettableStructObjectInspector oi = (SettableStructObjectInspector) createObjectInspector(getSinkFields());
+            OrcStruct struct = (OrcStruct) oi.create();
+            struct.setNumFields(getSinkFields().size());
+            sinkCall.getContext()[0] = struct;
+            sinkCall.getContext()[1] = oi;
         }
         
         Tuple tuple = entry.getTuple();
         OrcStruct struct = (OrcStruct)sinkCall.getContext()[0];
-        tuple2Struct(tuple, struct);
+        tuple2Struct(tuple, struct, (ObjectInspector)sinkCall.getContext()[1]);
         Writable row = serde.serialize(struct, (ObjectInspector)sinkCall.getContext()[1]);
         sinkCall.getOutput().collect(null, row);
     }
@@ -430,8 +444,11 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
         }
     }
 
-    private void tuple2Struct(Tuple tuple, OrcStruct struct) {
+    private void tuple2Struct(Tuple tuple, OrcStruct struct, ObjectInspector oi) {
         Object value = null;
+        SettableStructObjectInspector orcOi = (SettableStructObjectInspector) oi;
+        List<StructField> structFields = (List<StructField>) orcOi.getAllStructFieldRefs();
+        
         for (int i = 0; i < types.length; i++) {
             switch(typeMapping.get(types[i].toLowerCase())) {
                 case INT:
@@ -463,56 +480,55 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
                 default:
                     value = tuple.getObject(i) == null ? null : new Text(tuple.getString(i));
             }
-            struct.setFieldValue(i, value);
+            
+            orcOi.setStructFieldData(struct, structFields.get(i), value);
         }
     }
 
 
 
-    private ObjectInspector createObjectInspector() {
-        int size = getSinkFields().size();
-        List<OrcProto.Type> orcTypes = new ArrayList<OrcProto.Type>(size + 1);//the extra one for struct itself
-
-        OrcProto.Type.Builder builder = OrcProto.Type.newBuilder().setKind(OrcProto.Type.Kind.STRUCT);
+    private ObjectInspector createObjectInspector(Fields fields) {
+        int size = fields.size();
+        List<String> fieldNames = new ArrayList<String>(size);
+        List<TypeInfo> typeInfos = new ArrayList<TypeInfo>(size);
+        
         for (int i = 0; i < size; i++) {
-            builder.addFieldNames(getSinkFields().get(i).toString());
-            builder.addSubtypes(i + 1);
-        }
-        orcTypes.add(builder.build());
-
-        for (String type : types) {
+            fieldNames.add(fields.get(i).toString());
+            String type = types[i];
             switch(typeMapping.get(type.toLowerCase())) {
-                case INT:
-                    orcTypes.add(OrcProto.Type.newBuilder().setKind(OrcProto.Type.Kind.INT).build());
-                    break;
-                case BOOLEAN:
-                    orcTypes.add(OrcProto.Type.newBuilder().setKind(OrcProto.Type.Kind.BOOLEAN).build());
-                    break;
-                case TINYINT:
-                    orcTypes.add(OrcProto.Type.newBuilder().setKind(OrcProto.Type.Kind.BYTE).build());
-                    break;
-                case SMALLINT:
-                    orcTypes.add(OrcProto.Type.newBuilder().setKind(OrcProto.Type.Kind.SHORT).build());
-                    break;
-                case BIGINT:
-                    orcTypes.add(OrcProto.Type.newBuilder().setKind(OrcProto.Type.Kind.LONG).build());
-                    break;
-                case FLOAT:
-                    orcTypes.add(OrcProto.Type.newBuilder().setKind(OrcProto.Type.Kind.FLOAT).build());
-                    break;
-                case DOUBLE:
-                    orcTypes.add(OrcProto.Type.newBuilder().setKind(OrcProto.Type.Kind.DOUBLE).build());
-                    break;
-                case BIGDECIMAL:
-                    orcTypes.add(OrcProto.Type.newBuilder().setKind(OrcProto.Type.Kind.DECIMAL).build());
-                    break;
-                case STRING:
-                default:
-                    orcTypes.add(OrcProto.Type.newBuilder().setKind(OrcProto.Type.Kind.STRING).build());
+            case INT:
+                typeInfos.add(TypeInfoFactory.intTypeInfo);
+                break;
+            case BOOLEAN:
+                typeInfos.add(TypeInfoFactory.booleanTypeInfo);
+                break;
+            case TINYINT:
+                typeInfos.add(TypeInfoFactory.byteTypeInfo);
+                break;
+            case SMALLINT:
+                typeInfos.add(TypeInfoFactory.shortTypeInfo);
+                break;
+            case BIGINT:
+                typeInfos.add(TypeInfoFactory.longTypeInfo);
+                break;
+            case FLOAT:
+                typeInfos.add(TypeInfoFactory.floatTypeInfo);
+                break;
+            case DOUBLE:
+                typeInfos.add(TypeInfoFactory.doubleTypeInfo);
+                break;
+            case BIGDECIMAL:
+                typeInfos.add(TypeInfoFactory.decimalTypeInfo);
+                break;
+            case STRING:
+            default:
+                typeInfos.add(TypeInfoFactory.stringTypeInfo);
             }
         }
-
-        return OrcStruct.createObjectInspector(0, orcTypes);
+        
+        TypeInfo structInfo = TypeInfoFactory.getStructTypeInfo(fieldNames, typeInfos);
+        
+        return OrcStruct.createObjectInspector(structInfo);
     }
 
 

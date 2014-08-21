@@ -250,10 +250,6 @@
                                         <include>org/apache/hive/**</include>
                                     </includes>
                                     <excludes>
-                                        <exclude>org/apache/hadoop/hive/ql/io/orc/OrcOutputFormat.class</exclude>
-                                        <exclude>org/apache/hadoop/hive/ql/io/orc/OrcProto.class</exclude>
-                                        <exclude>org/apache/hadoop/hive/ql/io/orc/OrcSerde.class</exclude>
-                                        <exclude>org/apache/hadoop/hive/ql/io/orc/OrcStruct.class</exclude>
                                         <exclude>org/apache/hadoop/hive/serde2/SerDeUtils.class</exclude>
                                     </excludes>
                                 </filter>
