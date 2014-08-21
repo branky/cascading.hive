@@ -203,8 +203,15 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
             if (fs.isFile(statusPath)) {
                 Reader reader = OrcFile.createReader(fs, statusPath);
                 StructObjectInspector soi = (StructObjectInspector) reader.getObjectInspector();
-                extractSourceFields(soi);
+                if (soi.getAllStructFieldRefs().size() != 0) {
+                    extractSourceFields(soi);
+                    break;
+                }
             }
+        }
+        
+        if (getSourceFields() == null || getSourceFields().size() == 0) {
+            throw new IOException("unable to infer schema. please specify manually");
         }
     }
     
@@ -439,6 +446,36 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
             } else if (o instanceof BigDecimal) {
                 types[i] = Type.BIGDECIMAL.name().toLowerCase();
             } else {
+                types[i] = Type.STRING.name().toLowerCase();
+            }
+        }
+        
+        // field types have higher priority (if they are not null)
+        java.lang.reflect.Type[] fieldTypes = fields.getTypes();
+        if (fieldTypes == null) {
+            return;
+        }
+        for (int i = 0; i < fieldTypes.length; i++) {
+            if (fieldTypes[i] == null) {
+                continue;
+            }
+            if (fieldTypes[i] == Integer.class) {
+                types[i] = Type.INT.name().toLowerCase();
+            } else if (fieldTypes[i] == Boolean.class) {
+                types[i] = Type.BOOLEAN.name().toLowerCase();
+            } else if (fieldTypes[i] == Byte.class) {
+                types[i] = Type.TINYINT.name().toLowerCase();
+            } else if (fieldTypes[i] == Short.class) {
+                types[i] = Type.SMALLINT.name().toLowerCase();
+            } else if (fieldTypes[i] == Long.class) {
+                types[i] = Type.BIGINT.name().toLowerCase();
+            } else if (fieldTypes[i] == Float.class) {
+                types[i] = Type.FLOAT.name().toLowerCase();
+            } else if (fieldTypes[i] == Double.class) {
+                types[i] = Type.DOUBLE.name().toLowerCase();
+            } else if (fieldTypes[i] == BigDecimal.class) {
+                types[i] = Type.BIGDECIMAL.name().toLowerCase();
+            } else if (fieldTypes[i] == String.class) {
                 types[i] = Type.STRING.name().toLowerCase();
             }
         }
