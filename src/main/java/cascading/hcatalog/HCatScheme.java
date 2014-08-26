@@ -16,6 +16,7 @@ package cascading.hcatalog;
 
 import cascading.flow.FlowProcess;
 import cascading.hive.HiveProps;
+import cascading.hive.ORCFile.OrcSchemeOutputFormat;
 import cascading.scheme.Scheme;
 import cascading.scheme.SinkCall;
 import cascading.scheme.SourceCall;
@@ -23,6 +24,8 @@ import cascading.tap.Tap;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
+
+import org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.serde2.Deserializer;
 import org.apache.hadoop.hive.serde2.SerDeException;
@@ -114,6 +117,9 @@ public abstract class HCatScheme extends
         tableMetadata = hiveTable.getMetadata();
         inputFormat = hiveTable.getInputFormatClass();
         outputFormat = hiveTable.getOutputFormatClass();
+        if (outputFormat == OrcOutputFormat.class) {
+            outputFormat = OrcSchemeOutputFormat.class;
+        }
         hCatSchema = getTableHCatSchema(hiveTable, filter, conf);
         Fields fieldsFromSchema = new Fields(createFieldsArray(hCatSchema));
         if (fields == null) {
