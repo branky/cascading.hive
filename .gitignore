@@ -13,3 +13,5 @@ build
 .gradle
 output
 mem.h2.db
+out
+dependency-reduced-pom.xml
