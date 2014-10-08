@@ -28,8 +28,6 @@ import cascading.tuple.TupleEntry;
 import org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.serde2.Deserializer;
-import org.apache.hadoop.hive.serde2.SerDeException;
-import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
@@ -69,13 +67,13 @@ public abstract class HCatScheme extends
     private transient Deserializer serDe;
 
 /**
-	 * 
+	 *
 	 * @param db
 	 * @param table
 	 * @param filter Partition filter. The filter string should look like:
 	 *               "ds=20120401" where the datestamp "ds" is the partition column
 	 *                name and "20120401" is the value you want to read (year,
-	 *                month, and day). A filter can contain the operators 'and', 'or', 'like', 
+	 *                month, and day). A filter can contain the operators 'and', 'or', 'like',
 	 *                '()', '=', '<>' (not equal), '<', '>', '<=' and '>=' if the filter
 	 *                is Scan filter. only operator '=' is allowed is the filter is
 	 *                write filter
@@ -91,13 +89,26 @@ public abstract class HCatScheme extends
 	}
 
     private void createSerDe(JobConf conf) {
-        try {
-            serDe = SerDeUtils.lookupDeserializer(serdeName);
-            serDe.initialize(conf, tableMetadata);
-        } catch (SerDeException e) {
-            throw new RuntimeException("Unable to create serDe with name=" + serdeName + ", metadata=" + tableMetadata);
+        // Removed the dependency on Hive's old SerDeUtils.lookupDeserialzier() by putting the operative code directly in here.
+
+        // Lifted from Hive's org.apache.hadoop.hive.common.JavaUtils#getClassLoader(), but falls back to this class's class loader instead of JavaUtil's.
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        if (classLoader == null) {
+          classLoader = HCatScheme.class.getClassLoader();
         }
 
+        // Lifted from Hive's org.apache.hadoop.hive.serde2.SerDeUtils#lookupDeserializer().
+        Class<?> c;
+        try {
+            c = Class.forName(serdeName, true, classLoader);
+            serDe = (Deserializer) c.newInstance();
+            serDe.initialize(conf, tableMetadata);
+
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Unable to create serDe with name=" + serdeName + ", metadata=" + tableMetadata, e);
+        } catch (Exception e) {
+            throw new RuntimeException("Unable to create serDe with name=" + serdeName + ", metadata=" + tableMetadata, e);
+        }
     }
 
     protected Deserializer getSerDe() {
@@ -259,7 +270,7 @@ public abstract class HCatScheme extends
 	}
 
 	/**
-	 * 
+	 *
 	 * @param tuple
 	 * @param fields
 	 *            The fields that are bound to tuple entry
