@@ -28,7 +28,7 @@
 		<cascading.version>2.6.0</cascading.version>
 		<hive.version>0.13.1</hive.version>
 		<scala.version>2.10</scala.version>
-		<scalding.version>0.9.1</scalding.version>
+		<scalding.version>0.11.2</scalding.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 
