@@ -22,6 +22,13 @@ import cascading.tap.Tap;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.type.CoercibleType;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Properties;
+import java.util.regex.Pattern;
+import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
 import org.apache.hadoop.hive.ql.io.RCFileOutputFormat;
 import org.apache.hadoop.hive.serde2.ByteStream;
@@ -30,18 +37,21 @@ import org.apache.hadoop.hive.serde2.columnar.BytesRefArrayWritable;
 import org.apache.hadoop.hive.serde2.columnar.BytesRefWritable;
 import org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe;
 import org.apache.hadoop.hive.serde2.columnar.ColumnarStruct;
-import org.apache.hadoop.hive.serde2.lazy.*;
+import org.apache.hadoop.hive.serde2.lazy.LazyBinary;
+import org.apache.hadoop.hive.serde2.lazy.LazyBoolean;
+import org.apache.hadoop.hive.serde2.lazy.LazyByte;
+import org.apache.hadoop.hive.serde2.lazy.LazyDouble;
+import org.apache.hadoop.hive.serde2.lazy.LazyFloat;
+import org.apache.hadoop.hive.serde2.lazy.LazyHiveDecimal;
+import org.apache.hadoop.hive.serde2.lazy.LazyInteger;
+import org.apache.hadoop.hive.serde2.lazy.LazyLong;
+import org.apache.hadoop.hive.serde2.lazy.LazyShort;
+import org.apache.hadoop.hive.serde2.lazy.LazyString;
+import org.apache.hadoop.hive.serde2.lazy.LazyTimestamp;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.RecordReader;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.Properties;
-import java.util.regex.Pattern;
 
 /**
  * This is a {@link Scheme} subclass. RCFile (Record Columnar File) format can partition the data horizontally(rows) and
@@ -59,19 +69,21 @@ public class RCFile extends Scheme<JobConf, RecordReader, OutputCollector, Objec
     /*regular expression for comma separated string for column ids.*/
     private static final Pattern COMMA_SEPARATED_IDS = Pattern.compile("^([0-9]+,)*[0-9]+$");
 
-    /**Construct an instance of RCFile using specified array of field names and types.
-    * @param names field names
-    * @param types field types
-    * */
+    /**
+     * Construct an instance of RCFile using specified array of field names and types.
+     * @param names field names
+     * @param types field types
+     */
     public RCFile(String[] names, String[] types) {
         this(names, types, null);
     }
 
-    /**Construct an instance of RCFile using specified array of field names and types.
+    /**
+     * Construct an instance of RCFile using specified array of field names and types.
      * @param names field names
      * @param types field types
      * @param selectedColIds a list of column ids (started from 0) to explicitly specify which columns will be used
-     * */
+     */
     public RCFile(String[] names, String[] types, String selectedColIds) {
         super(new Fields(names), new Fields(names));
         this.types = types;
@@ -84,8 +96,8 @@ public class RCFile extends Scheme<JobConf, RecordReader, OutputCollector, Objec
      * describing the Hive schema, e.g.:
      * uid BIGINT, name STRING, description STRING
      * specifies 3 fields
-    * @param hiveScheme hive table scheme
-    */
+     * @param hiveScheme hive table scheme
+     */
     public RCFile(String hiveScheme) {
         this(hiveScheme, null);
     }
@@ -248,13 +260,18 @@ public class RCFile extends Scheme<JobConf, RecordReader, OutputCollector, Objec
         if (fieldType instanceof CoercibleType) {
             CoercibleType<?> coercible = (CoercibleType<?>) fieldType;
             out.write(coercible.coerce(field, String.class).toString().getBytes());
+        } else if (field instanceof byte[]) {
+            // The Hive serde serializes the binary type as a Base64 encoded string.
+            out.write(Base64.encodeBase64((byte[]) field));
         } else {
             out.write(field.toString().getBytes());
         }
         //TODO: need handle more cases
     }
 
-    /*convert hive lazy objects to java objects */
+    /*
+     * Convert Hive lazy objects to Java objects.
+     */
     private Object sourceField(Object value) {
         if (value instanceof LazyString) {
             value = ((LazyString) value).getWritableObject().toString();
@@ -272,11 +289,15 @@ public class RCFile extends Scheme<JobConf, RecordReader, OutputCollector, Objec
             value = (int) ((LazyByte) value).getWritableObject().get();
         } else if (value instanceof LazyShort) {
             value = ((LazyShort) value).getWritableObject().get();
+        } else if (value instanceof LazyBinary) {
+            value = ((LazyBinary) value).getWritableObject().getBytes();
+        } else if (value instanceof LazyHiveDecimal) {
+            value = ((LazyHiveDecimal) value).getWritableObject().getHiveDecimal();
+        } else if (value instanceof LazyTimestamp) {
+            value = ((LazyTimestamp) value).getWritableObject().getTimestamp();
         }
         //TODO: need handle more types
         return value;
-
     }
-
 }
 
