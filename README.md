@@ -15,7 +15,7 @@ Maven dependency
 <dependency>
   <groupId>com.ebay</groupId>
   <artifactId>cascading-hive</artifactId>
-  <version>0.0.3-SNAPSHOT</version>
+  <version>0.0.4-SNAPSHOT</version>
   <scope>compile</scope>
 </dependency> 
 ```
@@ -23,7 +23,7 @@ Maven dependency
 
 Hive version
 ------------
-Currently, this module works with Apache Hive 0.12 (version 0.0.2-SNAPSHOT) and 0.13 (version 0.0.3-SNAPSHOT). If you want to use it with other versions of Hive, you need to patch [few classes](https://github.com/branky/cascading.hive/tree/master/src/main/java/org/apache/hadoop/hive).
+Currently, this module works with Apache Hive 0.12 (version 0.0.2-SNAPSHOT) and 0.13 (version 0.0.3-SNAPSHOT and above). If you want to use it with other versions of Hive, you need to patch [few classes](https://github.com/branky/cascading.hive/tree/master/src/main/java/org/apache/hadoop/hive).
 
 
 
@@ -60,6 +60,6 @@ hadoop jar $your_fat_jar -libjars $HIVE_HOME/lib/hive-metastore.jar,$HIVE_HOME/l
 
 Scalding usage
 --------------
-To use RCFile/ORC with Scalding, check out [ColumnarSerDeSource.scala](https://github.com/branky/cascading.hive/blob/master/src/main/scala/com/twitter/scalding/ColumnarSerDeSource.scala). It requires Scalding 0.9.1.
+To use RCFile/ORC with Scalding, check out [ColumnarSerDeSource.scala](https://github.com/branky/cascading.hive/blob/master/src/main/scala/com/twitter/scalding/ColumnarSerDeSource.scala). It requires Scalding 0.9.1 and above.
 
 

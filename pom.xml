@@ -18,17 +18,17 @@
 	<groupId>com.ebay</groupId>
 	<artifactId>cascading-hive</artifactId>
 	<packaging>jar</packaging>
-	<version>0.0.3-SNAPSHOT</version>
+	<version>0.0.4-SNAPSHOT</version>
 	<name>Cascading adapters for Hive and HCatalog</name>
 	<properties>
 		<targetJdk>1.6</targetJdk>
 		<java.version>1.6</java.version>
         <hadoop1.version>1.2.1</hadoop1.version>
 		<hadoop2.version>2.2.0</hadoop2.version>
-		<cascading.version>2.5.0</cascading.version>
+		<cascading.version>2.6.0</cascading.version>
 		<hive.version>0.13.1</hive.version>
 		<scala.version>2.10</scala.version>
-		<scalding.version>0.9.1</scalding.version>
+		<scalding.version>0.11.2</scalding.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 
