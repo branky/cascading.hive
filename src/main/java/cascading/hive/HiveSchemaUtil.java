@@ -16,9 +16,6 @@ package cascading.hive;
 
 import java.util.ArrayList;
 
-/**
- *
- */
 public class HiveSchemaUtil {
 
     /**
@@ -38,7 +35,7 @@ public class HiveSchemaUtil {
            if (pair.length != 2) {
                throw new RuntimeException("malformed <name,type> pair found: " + str );
            }
-           names.add(pair[0].trim().toLowerCase());
+           names.add(pair[0].trim());
            types.add(pair[1].trim().toLowerCase());
         }
         if (names.size() == 0) {
