@@ -22,6 +22,7 @@ import org.antlr.runtime.TokenRewriteStream;
 import org.antlr.runtime.TokenStream;
 import org.antlr.runtime.tree.CommonTree;
 import org.antlr.runtime.tree.CommonTreeAdaptor;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.parser.ExpressionTree;
 import org.apache.hadoop.hive.ql.parse.ASTErrorNode;
@@ -35,6 +36,7 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 public class HiveSchemaUtil {
     public static ArrayList<String>[] parse(String schema) {
         HiveLexer lexer = new HiveLexer(new ExpressionTree.ANTLRNoCaseStringStream(schema));
+        lexer.setHiveConf(new Configuration());
         HiveParser parser = new HiveParser(new TokenRewriteStream(lexer));
         parser.setTreeAdaptor(new CommonTreeAdaptor() {
             @Override
