@@ -14,15 +14,15 @@
 
 package cascading.hive;
 
-import cascading.flow.FlowProcess;
-import cascading.scheme.Scheme;
-import cascading.scheme.SinkCall;
-import cascading.scheme.SourceCall;
-import cascading.tap.CompositeTap;
-import cascading.tap.Tap;
-import cascading.tuple.Fields;
-import cascading.tuple.Tuple;
-import cascading.tuple.TupleEntry;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -46,7 +46,14 @@ import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
-import org.apache.hadoop.io.*;
+import org.apache.hadoop.io.BooleanWritable;
+import org.apache.hadoop.io.FloatWritable;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.MapWritable;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.FileOutputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
@@ -54,14 +61,17 @@ import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.RecordWriter;
 import org.apache.hadoop.util.Progressable;
 
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.regex.Pattern;
+import cascading.flow.FlowProcess;
+import cascading.scheme.Scheme;
+import cascading.scheme.SinkCall;
+import cascading.scheme.SourceCall;
+import cascading.tap.CompositeTap;
+import cascading.tap.Tap;
+import cascading.tuple.Fields;
+import cascading.tuple.Tuple;
+import cascading.tuple.TupleEntry;
+
+import com.google.common.base.Splitter;
 
 /**
  * This is a {@link Scheme} subclass. ORC(Optimized Record Columnar File) file format can be seen as "advanced" RCFile,
@@ -71,12 +81,13 @@ import java.util.regex.Pattern;
  */
 public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Object[], Object[]> {
 
-    static enum Type { STRING, TINYINT, BOOLEAN, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, BIGDECIMAL;}
+    static enum Type { STRING, TINYINT, BOOLEAN, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, BIGDECIMAL, MAP;}
 
-    /*columns' ids(start from zero), concatenated with comma.*/
+    /* columns' ids(start from zero), concatenated with comma. */
     private String selectedColIds = null;
-    /*regular expression for comma separated string for column ids.*/
+    /* regular expression for comma separated string for column ids. */
     private static final Pattern COMMA_SEPARATED_IDS = Pattern.compile("^([0-9]+,)*[0-9]+$");
+    private static final String MAP_FORMAT_REGEX = "map[\\<].*,.*[\\>]";
     private String[] types;
     private transient OrcSerde serde;
 
@@ -176,6 +187,7 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
         typeMapping.put("bigint", Type.BIGINT);
         typeMapping.put("smallint", Type.SMALLINT);
         typeMapping.put("boolean", Type.BOOLEAN);
+        typeMapping.put("map", Type.MAP);
     }
 
     private void inferSchema(FlowProcess<JobConf> flowProcess, Tap tap) throws IOException {
@@ -317,35 +329,43 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
         List<Object> values = soi.getStructFieldsDataAsList(struct);
         
         for (int i = 0; i < types.length; i++) {
-            switch(typeMapping.get(types[i].toLowerCase())) {
-                case INT:
-                    value =  values.get(i) == null ? null : ((IntWritable) values.get(i)).get();
-                    break;
-                case BOOLEAN:
-                    value =  values.get(i) == null ? null : ((BooleanWritable) values.get(i)).get();
-                    break;
-                case TINYINT:
-                    value =  values.get(i) == null ? null : ((ByteWritable) values.get(i)).get();
-                    break;
-                case SMALLINT:
-                    value =  values.get(i) == null ? null : ((ShortWritable) values.get(i)).get();
-                    break;
-                case BIGINT:
-                    value =  values.get(i) == null ? null : ((LongWritable) values.get(i)).get();
-                    break;
-                case FLOAT:
-                    value =  values.get(i) == null ? null : ((FloatWritable) values.get(i)).get();
-                    break;
-                case DOUBLE:
-                    value =  values.get(i) == null ? null : ((DoubleWritable) values.get(i)).get();
-                    break;
-                case BIGDECIMAL:
-                    value =  values.get(i) == null ? null :
-                            ((HiveDecimalWritable) values.get(i)).getHiveDecimal().bigDecimalValue();
-                    break;
-                case STRING:
-                default:
-                    value =  values.get(i) == null ? null :  values.get(i).toString();
+            String type = types[i].toLowerCase();
+            if (type.startsWith("map")) {
+                type = "map";
+            }
+
+            switch (typeMapping.get(type)) {
+            case INT:
+                value = values.get(i) == null ? null : ((IntWritable) values.get(i)).get();
+                break;
+            case BOOLEAN:
+                value = values.get(i) == null ? null : ((BooleanWritable) values.get(i)).get();
+                break;
+            case TINYINT:
+                value = values.get(i) == null ? null : ((ByteWritable) values.get(i)).get();
+                break;
+            case SMALLINT:
+                value = values.get(i) == null ? null : ((ShortWritable) values.get(i)).get();
+                break;
+            case BIGINT:
+                value = values.get(i) == null ? null : ((LongWritable) values.get(i)).get();
+                break;
+            case FLOAT:
+                value = values.get(i) == null ? null : ((FloatWritable) values.get(i)).get();
+                break;
+            case DOUBLE:
+                value = values.get(i) == null ? null : ((DoubleWritable) values.get(i)).get();
+                break;
+            case BIGDECIMAL:
+            	value =  values.get(i) == null ? null :
+                	((HiveDecimalWritable) values.get(i)).getHiveDecimal().bigDecimalValue();
+                break;
+            case MAP:
+                value = values.get(i) == null ? null : ((Map<?, ?>) values.get(i));
+                break;
+            case STRING:
+            default:
+                value = values.get(i) == null ? null : values.get(i).toString();
             }
 
             tuple.add(value);
@@ -445,6 +465,8 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
                 types[i] = Type.DOUBLE.name().toLowerCase();
             } else if (o instanceof BigDecimal) {
                 types[i] = Type.BIGDECIMAL.name().toLowerCase();
+            } else if (o instanceof Map<?, ?>) {
+                types[i] = Type.MAP.name().toLowerCase();
             } else {
                 types[i] = Type.STRING.name().toLowerCase();
             }
@@ -477,6 +499,8 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
                 types[i] = Type.BIGDECIMAL.name().toLowerCase();
             } else if (fieldTypes[i] == String.class) {
                 types[i] = Type.STRING.name().toLowerCase();
+            } else if (fieldTypes[i] == Map.class) {
+                types[i] = Type.MAP.name().toLowerCase();
             }
         }
     }
@@ -487,35 +511,42 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
         List<StructField> structFields = (List<StructField>) orcOi.getAllStructFieldRefs();
         
         for (int i = 0; i < types.length; i++) {
-            switch(typeMapping.get(types[i].toLowerCase())) {
-                case INT:
-                    value = tuple.getObject(i) == null ? null : new IntWritable(tuple.getInteger(i));
-                    break;
-                case BOOLEAN:
-                    value = tuple.getObject(i) == null ? null : new BooleanWritable(tuple.getBoolean(i));
-                    break;
-                case TINYINT:
-                    value = tuple.getObject(i) == null ? null : new ByteWritable(Byte.valueOf(tuple.getString(i)));
-                    break;
-                case SMALLINT:
-                    value = tuple.getObject(i) == null ? null : new ShortWritable(tuple.getShort(i));
-                    break;
-                case BIGINT:
-                    value = tuple.getObject(i) == null ? null : new LongWritable(tuple.getLong(i));
-                    break;
-                case FLOAT:
-                    value = tuple.getObject(i) == null ? null : new FloatWritable(tuple.getFloat(i));
-                    break;
-                case DOUBLE:
-                    value = tuple.getObject(i) == null ? null : new DoubleWritable(tuple.getDouble(i));
-                    break;
-                case BIGDECIMAL:
-                    value = tuple.getObject(i) == null ? null : new HiveDecimalWritable(
-                            HiveDecimal.create(new BigDecimal(tuple.getString(i))));
-                    break;
-                case STRING:
-                default:
-                    value = tuple.getObject(i) == null ? null : new Text(tuple.getString(i));
+            String type = types[i].toLowerCase();
+            if (type.startsWith("map")) {
+                type = "map";
+            }
+            switch (typeMapping.get(type)) {
+            case INT:
+                value = tuple.getObject(i) == null ? null : new IntWritable(tuple.getInteger(i));
+                break;
+            case BOOLEAN:
+                value = tuple.getObject(i) == null ? null : new BooleanWritable(tuple.getBoolean(i));
+                break;
+            case TINYINT:
+                value = tuple.getObject(i) == null ? null : new ByteWritable(Byte.valueOf(tuple.getString(i)));
+                break;
+            case SMALLINT:
+                value = tuple.getObject(i) == null ? null : new ShortWritable(tuple.getShort(i));
+                break;
+            case BIGINT:
+                value = tuple.getObject(i) == null ? null : new LongWritable(tuple.getLong(i));
+                break;
+            case FLOAT:
+                value = tuple.getObject(i) == null ? null : new FloatWritable(tuple.getFloat(i));
+                break;
+            case DOUBLE:
+                value = tuple.getObject(i) == null ? null : new DoubleWritable(tuple.getDouble(i));
+                break;
+            case BIGDECIMAL:
+                value = tuple.getObject(i) == null ? null : new HiveDecimalWritable(HiveDecimal.create(new BigDecimal(
+                        tuple.getString(i))));
+                break;
+            case MAP:
+                value = tuple.getObject(i) == null ? null : createMapWritable(splitToMap(tuple.getString(i)), types[i]);
+                break;
+            case STRING:
+            default:
+                value = tuple.getObject(i) == null ? null : new Text(tuple.getString(i));
             }
             
             orcOi.setStructFieldData(struct, structFields.get(i), value);
@@ -531,44 +562,167 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
         
         for (int i = 0; i < size; i++) {
             fieldNames.add(fields.get(i).toString());
-            String type = types[i];
-            switch(typeMapping.get(type.toLowerCase())) {
-            case INT:
-                typeInfos.add(TypeInfoFactory.intTypeInfo);
-                break;
-            case BOOLEAN:
-                typeInfos.add(TypeInfoFactory.booleanTypeInfo);
-                break;
-            case TINYINT:
-                typeInfos.add(TypeInfoFactory.byteTypeInfo);
-                break;
-            case SMALLINT:
-                typeInfos.add(TypeInfoFactory.shortTypeInfo);
-                break;
-            case BIGINT:
-                typeInfos.add(TypeInfoFactory.longTypeInfo);
-                break;
-            case FLOAT:
-                typeInfos.add(TypeInfoFactory.floatTypeInfo);
-                break;
-            case DOUBLE:
-                typeInfos.add(TypeInfoFactory.doubleTypeInfo);
-                break;
-            case BIGDECIMAL:
-                typeInfos.add(TypeInfoFactory.decimalTypeInfo);
-                break;
-            case STRING:
-            default:
-                typeInfos.add(TypeInfoFactory.stringTypeInfo);
-            }
+            typeInfos.add(getTypeInfo(types[i]));
         }
-        
         TypeInfo structInfo = TypeInfoFactory.getStructTypeInfo(fieldNames, typeInfos);
-        
+
         return OrcStruct.createObjectInspector(structInfo);
     }
 
+    /**
+     * Split the given string format to Map
+     * 
+     * @param input
+     *            The map format
+     * @return Map instance
+     */
+    private Map<?, ?> splitToMap(String input) {
+        String mapFormat = input.substring(input.indexOf("{") + 1, input.lastIndexOf("}"));
+        if (mapFormat == null || mapFormat.isEmpty()) {
+            return null;
+        }
+        return Splitter.on(",").withKeyValueSeparator(":").split(mapFormat);
+    }
 
+    /**
+     * Creates MapWritable instance with key and value
+     * 
+     * @param map
+     *            Map instance
+     * @param mapString
+     *            Map format used to parse the type of key and value
+     * @return MapWritable
+     */
+    private MapWritable createMapWritable(Map<?, ?> map, String mapString) {
+        MapWritable result = new MapWritable();
+
+        if (map != null) {
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                TypeInfo[] types = getMapValueTypes(mapString);
+                result.put(createObject(entry.getKey(), types[0]), createObject(entry.getValue(), types[1]));
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Creates appropriate Writable instance with value. The default will be string.
+     * 
+     * @param obj
+     *            The value
+     * @param typeInfo
+     *            Type of value
+     * @return Writable
+     */
+    private Writable createObject(Object obj, TypeInfo typeInfo) {
+        Type type = typeMapping.get(typeInfo.getTypeName()) == null ? Type.STRING : typeMapping.get(typeInfo
+                .getTypeName());
+        String value = obj.toString();
+        switch (type) {
+        case INT:
+            return new IntWritable(Integer.parseInt(value));
+        case BOOLEAN:
+            return new BooleanWritable(Boolean.valueOf(value));
+        case TINYINT:
+            return new ByteWritable(Byte.valueOf(value));
+        case SMALLINT:
+            return new ShortWritable(Short.parseShort(value));
+        case BIGINT:
+            return new LongWritable(Long.parseLong(value));
+        case FLOAT:
+            return new FloatWritable(Float.parseFloat(value));
+        case DOUBLE:
+            return new DoubleWritable(Double.parseDouble(value));
+        case BIGDECIMAL:
+            return new HiveDecimalWritable(HiveDecimal.create(new BigDecimal(value)));
+        case STRING:
+        default:
+            return new Text((String) value);
+        }
+    }
+
+    /**
+     * Parse the given map format string to array of TypeInfo which contains key
+     * type and value type respectively
+     * 
+     * @param map
+     *            The input map format
+     * @return Array of TypeInfo
+     */
+    private TypeInfo[] getMapValueTypes(String map) {
+
+        validateMapString(map);
+
+        TypeInfo[] typeInfos = new TypeInfo[2];
+
+        String orginal = map.toLowerCase().replaceAll("[map<>]", "").trim();
+        String[] types = orginal.split(",");
+
+        for (int count = 0; count < 2; count++) {
+            typeInfos[count] = getTypeInfo(types[count].trim());
+        }
+        return typeInfos;
+    }
+
+    /**
+     * Check the string is a valid map format
+     * 
+     * @param mapString
+     * @throws IllegalArgumentException
+     *             if the map format is not valid
+     */
+    private void validateMapString(String mapString) {
+        if (mapString == null || mapString.isEmpty() || (!mapString.toLowerCase().trim().matches(MAP_FORMAT_REGEX))) {
+            throw new IllegalArgumentException("Invalid map format: " + mapString);
+        }
+    }
+
+    /**
+     * Gets the appropriate instance of {@link TypeInfo} from the given string.
+     * Default type is STRING
+     * 
+     * @param field
+     * @return TypeInfo
+     */
+    private TypeInfo getTypeInfo(String field) {
+
+        if (field == null) {
+            return null;
+        }
+
+        String fieldType = field;
+        if (fieldType.toLowerCase().startsWith("map")) {
+            fieldType = "map";
+        }
+        
+        Type type = typeMapping.get(fieldType.toLowerCase()) == null ? Type.STRING : typeMapping.get(fieldType
+                .toLowerCase());
+
+        switch (type) {
+        case INT:
+            return TypeInfoFactory.intTypeInfo;
+        case BOOLEAN:
+            return TypeInfoFactory.booleanTypeInfo;
+        case TINYINT:
+            return TypeInfoFactory.byteTypeInfo;
+        case SMALLINT:
+            return TypeInfoFactory.shortTypeInfo;
+        case BIGINT:
+            return TypeInfoFactory.longTypeInfo;
+        case FLOAT:
+            return TypeInfoFactory.floatTypeInfo;
+        case DOUBLE:
+            return TypeInfoFactory.doubleTypeInfo;
+        case BIGDECIMAL:
+            return TypeInfoFactory.decimalTypeInfo;
+        case MAP:
+            TypeInfo[] mapFieldTypes = getMapValueTypes(field);
+            return TypeInfoFactory.getMapTypeInfo(mapFieldTypes[0], mapFieldTypes[1]);
+        case STRING:
+        default:
+            return TypeInfoFactory.stringTypeInfo;
+        }
+    }
 }
 
 
