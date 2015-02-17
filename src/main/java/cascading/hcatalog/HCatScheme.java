@@ -16,7 +16,6 @@ package cascading.hcatalog;
 
 import cascading.flow.FlowProcess;
 import cascading.hive.HiveProps;
-import cascading.hive.ORCFile.OrcSchemeOutputFormat;
 import cascading.scheme.Scheme;
 import cascading.scheme.SinkCall;
 import cascading.scheme.SourceCall;
@@ -24,8 +23,7 @@ import cascading.tap.Tap;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
-
-import org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.serde2.Deserializer;
 import org.apache.hadoop.hive.serde2.SerDeException;
@@ -49,7 +47,7 @@ import java.util.Random;
 
 @SuppressWarnings({ "serial", "rawtypes" })
 public abstract class HCatScheme extends
-		Scheme<JobConf, RecordReader, OutputCollector, Object[], Object[]> {
+		Scheme<Configuration, RecordReader, OutputCollector, Object[], Object[]> {
 
 	private static final Logger LOG = LoggerFactory
 			.getLogger(HCatScheme.class);
@@ -90,7 +88,7 @@ public abstract class HCatScheme extends
 		randomNumber = new Random(System.currentTimeMillis()).nextInt();
 	}
 
-    private void createSerDe(JobConf conf) {
+    private void createSerDe(Configuration conf) {
         try {
             serDe = SerDeUtils.lookupDeserializer(serdeName);
             serDe.initialize(conf, tableMetadata);
@@ -105,21 +103,22 @@ public abstract class HCatScheme extends
     }
 
 	@Override
-	public void sourceConfInit(FlowProcess<JobConf> flowProcess,
-			Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
-		conf.setInputFormat(inputFormat);
+	public void sourceConfInit(FlowProcess<? extends Configuration> flowProcess,
+			Tap<Configuration, RecordReader, OutputCollector> tap, Configuration conf) {
+		conf.setBoolean("mapred.mapper.new-api", false);
+		conf.setClass("mapred.input.format.class", inputFormat, InputFormat.class);
         createSerDe(conf);
 	}
 
-    private Fields retrieveFieldsFromHCat(JobConf conf) {
+    private Fields retrieveFieldsFromHCat(Configuration conf) {
         Table hiveTable = CascadingHCatUtil.getHiveTable(db, table, conf);
         serdeName = hiveTable.getSerializationLib();
         tableMetadata = hiveTable.getMetadata();
         inputFormat = hiveTable.getInputFormatClass();
         outputFormat = hiveTable.getOutputFormatClass();
-        if (outputFormat == OrcOutputFormat.class) {
-            outputFormat = OrcSchemeOutputFormat.class;
-        }
+//        if (outputFormat == OrcOutputFormat.class) {
+//            outputFormat = OrcSchemeOutputFormat.class;
+//        }
         hCatSchema = getTableHCatSchema(hiveTable, filter, conf);
         Fields fieldsFromSchema = new Fields(createFieldsArray(hCatSchema));
         if (fields == null) {
@@ -140,8 +139,8 @@ public abstract class HCatScheme extends
      * @param tap         of type Tap
      * @return Fields
      */
-    public Fields retrieveSourceFields(FlowProcess<JobConf> flowProcess, Tap tap) {
-        JobConf conf = flowProcess.getConfigCopy();
+    public Fields retrieveSourceFields(FlowProcess<? extends Configuration> flowProcess, Tap tap) {
+        Configuration conf = flowProcess.getConfigCopy();
         return retrieveFieldsFromHCat(conf);
     }
 
@@ -152,8 +151,8 @@ public abstract class HCatScheme extends
      * @param tap         of type Tap
      * @return Fields
      */
-    public Fields retrieveSinkFields( FlowProcess<JobConf> flowProcess, Tap tap ){
-        JobConf conf = flowProcess.getConfigCopy();
+    public Fields retrieveSinkFields( FlowProcess<? extends Configuration> flowProcess, Tap tap ){
+        Configuration conf = flowProcess.getConfigCopy();
         return retrieveFieldsFromHCat(conf);
     }
 
@@ -176,19 +175,20 @@ public abstract class HCatScheme extends
 	 * @return
 	 */
 	protected abstract HCatSchema getTableHCatSchema(Table hiveTable,
-			String filter, JobConf conf);
+			String filter, Configuration conf);
 
 	@Override
-	public void sinkConfInit(FlowProcess<JobConf> flowProcess,
-			Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
-		conf.setOutputFormat(outputFormat);
+	public void sinkConfInit(FlowProcess<? extends Configuration> flowProcess,
+			Tap<Configuration, RecordReader, OutputCollector> tap, Configuration conf) {
+		conf.setBoolean("mapred.mapper.new-api", false);
+		conf.setClass("mapred.output.format.class", outputFormat, OutputFormat.class);
         conf.set(HiveProps.HIVE_COLUMNS, (String)tableMetadata.get(HiveProps.HIVE_COLUMNS));
         conf.set(HiveProps.HIVE_COLUMN_TYPES, (String)tableMetadata.get(HiveProps.HIVE_COLUMN_TYPES));
         createSerDe(conf);
 	}
 
 	@Override
-	public void sourcePrepare(FlowProcess<JobConf> flowProcess,
+	public void sourcePrepare(FlowProcess<? extends Configuration> flowProcess,
 			SourceCall<Object[], RecordReader> sourceCall) throws IOException {
 		Object[] pair = new Object[] { sourceCall.getInput().createKey(),
 				sourceCall.getInput().createValue() };
@@ -198,7 +198,7 @@ public abstract class HCatScheme extends
 	}
 
 	@Override
-	public void sinkPrepare(FlowProcess<JobConf> flowProcess,
+	public void sinkPrepare(FlowProcess<? extends Configuration> flowProcess,
 			SinkCall<Object[], OutputCollector> sinkCall) throws IOException {
 		List<TypeInfo> colTypes = new ArrayList<TypeInfo>();
         List<HCatFieldSchema> fields = getHCatSchema().getFields();
@@ -220,7 +220,7 @@ public abstract class HCatScheme extends
 	}
 
 	@Override
-	public boolean source(FlowProcess<JobConf> flowProcess,
+	public boolean source(FlowProcess<? extends Configuration> flowProcess,
 			SourceCall<Object[], RecordReader> sourceCall) throws IOException {
 
 		if (!sourceReadInput(sourceCall)) {
@@ -250,7 +250,7 @@ public abstract class HCatScheme extends
 	}
 
 	@Override
-	public void sink(FlowProcess<JobConf> flowProcess,
+	public void sink(FlowProcess<? extends Configuration> flowProcess,
 			SinkCall<Object[], OutputCollector> sinkCall) throws IOException {
 		TupleEntry tupleEntry = sinkCall.getOutgoingEntry();
 
@@ -271,13 +271,13 @@ public abstract class HCatScheme extends
 			Object[] context, OutputCollector output) throws IOException;
 
 	@Override
-	public void sourceCleanup(FlowProcess<JobConf> flowProcess,
+	public void sourceCleanup(FlowProcess<? extends Configuration> flowProcess,
 			SourceCall<Object[], RecordReader> sourceCall) {
 		sourceCall.setContext(null);
 	}
 
 	@Override
-	public void sinkCleanup(FlowProcess<JobConf> flowProcess,
+	public void sinkCleanup(FlowProcess<? extends Configuration> flowProcess,
 			SinkCall<Object[], OutputCollector> sinkCall) {
 		sinkCall.setContext(null);
 	}

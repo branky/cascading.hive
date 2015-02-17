@@ -23,18 +23,13 @@ import cascading.tap.Tap;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
-
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
-import org.apache.hadoop.hive.ql.io.orc.OrcFile;
-import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
-import org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat;
-import org.apache.hadoop.hive.ql.io.orc.OrcSerde;
-import org.apache.hadoop.hive.ql.io.orc.OrcStruct;
-import org.apache.hadoop.hive.ql.io.orc.Reader;
+import org.apache.hadoop.hive.ql.io.orc.*;
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
@@ -47,20 +42,14 @@ import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.io.*;
-import org.apache.hadoop.mapred.FileOutputFormat;
-import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.OutputCollector;
+import org.apache.hadoop.mapred.OutputFormat;
 import org.apache.hadoop.mapred.RecordReader;
-import org.apache.hadoop.mapred.RecordWriter;
-import org.apache.hadoop.util.Progressable;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Pattern;
 
 /**
@@ -69,7 +58,7 @@ import java.util.regex.Pattern;
  * This class mainly developed for writing Cascading output to ORCFile format to be consumed by Hive afterwards. It also
  * support read, also support optimization as Hive(less HDFS_BYTES_READ less CPU).
  */
-public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Object[], Object[]> {
+public class ORCFile extends Scheme<Configuration, RecordReader, OutputCollector, Object[], Object[]> {
 
     static enum Type { STRING, TINYINT, BOOLEAN, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, BIGDECIMAL;}
 
@@ -178,7 +167,7 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
         typeMapping.put("boolean", Type.BOOLEAN);
     }
 
-    private void inferSchema(FlowProcess<JobConf> flowProcess, Tap tap) throws IOException {
+    private void inferSchema(FlowProcess<? extends Configuration> flowProcess, Tap tap) throws IOException {
         if (tap instanceof CompositeTap) {
             tap = (Tap) ((CompositeTap) tap).getChildTaps().next();
         }
@@ -248,7 +237,7 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
      * @return Fields
      */
     @Override
-    public Fields retrieveSourceFields(FlowProcess<JobConf> flowProcess, Tap tap) {
+    public Fields retrieveSourceFields(FlowProcess<? extends Configuration> flowProcess, Tap tap) {
         if (types == null) {    // called by planner
             try {
                 inferSchema(flowProcess, tap);
@@ -262,7 +251,7 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
     }
 
     @Override
-    public void sourcePrepare(FlowProcess<JobConf> flowProcess, SourceCall<Object[], RecordReader> sourceCall ) throws IOException {
+    public void sourcePrepare(FlowProcess<? extends Configuration> flowProcess, SourceCall<Object[], RecordReader> sourceCall ) throws IOException {
         sourceCall.setContext(new Object[3]);
 
         sourceCall.getContext()[0] = sourceCall.getInput().createKey();
@@ -271,7 +260,7 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
     }
 
     @Override
-    public void sourceCleanup(FlowProcess<JobConf> flowProcess,
+    public void sourceCleanup(FlowProcess<? extends Configuration> flowProcess,
                               SourceCall<Object[], RecordReader> sourceCall) {
         sourceCall.setContext(null);
     }
@@ -283,9 +272,10 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
     }
 
     @Override
-    public void sourceConfInit(FlowProcess<JobConf> flowProcess, Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
-        conf.setInputFormat(OrcInputFormat.class);
-        if (selectedColIds != null) {
+    public void sourceConfInit(FlowProcess<? extends Configuration> flowProcess, Tap<Configuration, RecordReader, OutputCollector> tap, Configuration conf) {
+        conf.setBoolean("mapred.mapper.new-api", false);
+        conf.setClass("mapred.input.format.class", OrcInputFormat.class, InputFormat.class);
+              if (selectedColIds != null) {
             conf.set(HiveProps.HIVE_SELECTD_COLUMN_IDS, selectedColIds);
             conf.set(HiveProps.HIVE_READ_ALL_COLUMNS, "false");
         }
@@ -301,7 +291,7 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
     }
 
     @Override
-    public boolean source(FlowProcess<JobConf> flowProcess, SourceCall<Object[], RecordReader> sourceCall) throws IOException {
+    public boolean source(FlowProcess<? extends Configuration> flowProcess, SourceCall<Object[], RecordReader> sourceCall) throws IOException {
         if (!sourceReadInput(sourceCall))
             return false;
         Tuple tuple = sourceCall.getIncomingEntry().getTuple();
@@ -351,30 +341,18 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
             tuple.add(value);
         }
     }
-    
-    /**
-     * fix the output path issue of OrcOutputFormats
-     */
-    public static class OrcSchemeOutputFormat extends OrcOutputFormat {
-        @Override
-        public RecordWriter getRecordWriter(FileSystem fileSystem,
-                JobConf conf, String name, Progressable reporter)
-                throws IOException {
-            Path file = FileOutputFormat.getTaskOutputPath(conf, name);
-            return super.getRecordWriter(fileSystem, conf, file.toString(),
-                    reporter);
-        }
+
+
+    @Override
+    public void sinkConfInit(FlowProcess<? extends Configuration> flowProcess, Tap<Configuration, RecordReader, OutputCollector> tap, Configuration conf) {
+        conf.setBoolean("mapred.mapper.new-api", false);
+        conf.setClass("mapred.output.key.class", NullWritable.class, Object.class);
+        conf.setClass("mapred.output.value.class", Writable.class, Object.class);
+        conf.setClass("mapred.output.format.class", OrcOutputFormat.class, OutputFormat.class);
     }
 
     @Override
-    public void sinkConfInit(FlowProcess<JobConf> flowProcess, Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
-        conf.setOutputKeyClass(NullWritable.class);
-        conf.setOutputValueClass(Writable.class);
-        conf.setOutputFormat(OrcSchemeOutputFormat.class );
-    }
-
-    @Override
-    public void sinkPrepare(FlowProcess<JobConf> flowProcess, SinkCall<Object[], OutputCollector> sinkCall ) throws IOException {
+    public void sinkPrepare(FlowProcess<? extends Configuration> flowProcess, SinkCall<Object[], OutputCollector> sinkCall ) throws IOException {
         if (serde == null) {
             serde = new OrcSerde();
         }
@@ -392,13 +370,13 @@ public class ORCFile extends Scheme<JobConf, RecordReader, OutputCollector, Obje
     }
 
     @Override
-    public void sinkCleanup(FlowProcess<JobConf> flowProcess,
+    public void sinkCleanup(FlowProcess<? extends Configuration> flowProcess,
                             SinkCall<Object[], OutputCollector> sinkCall) {
         sinkCall.setContext(null);
     }
 
     @Override
-    public void sink(FlowProcess<JobConf> flowProcess, SinkCall<Object[], OutputCollector> sinkCall) throws IOException {
+    public void sink(FlowProcess<? extends Configuration> flowProcess, SinkCall<Object[], OutputCollector> sinkCall) throws IOException {
         TupleEntry entry = sinkCall.getOutgoingEntry();
         if (sinkCall.getContext()[0] == null) { // initialize
             extractSinkFields(entry);

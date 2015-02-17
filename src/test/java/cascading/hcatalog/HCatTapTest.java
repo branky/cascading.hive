@@ -16,7 +16,7 @@ package cascading.hcatalog;
 
 import cascading.flow.Flow;
 import cascading.flow.FlowConnector;
-import cascading.flow.hadoop.HadoopFlowConnector;
+import cascading.flow.hadoop2.Hadoop2MR1FlowConnector;
 import cascading.flow.planner.PlannerException;
 import cascading.hive.RCFile;
 import cascading.operation.Identity;
@@ -54,7 +54,7 @@ public class HCatTapTest {
 
 	@Before
 	public void setUp() throws Exception {
-		connector = new HadoopFlowConnector(new Properties());
+		connector = new Hadoop2MR1FlowConnector(new Properties());
 		hcatOut = "src/test/resources/data/hcatout.txt";
 		hcatRcOut = "src/test/resources/data/test.rc.txt";
 		hcatIn = "src/test/resources/data/sample_07.csv";

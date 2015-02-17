@@ -18,12 +18,12 @@ import cascading.cascade.CascadeException;
 import cascading.tuple.Fields;
 import cascading.tuple.FieldsResolverException;
 import cascading.tuple.Tuple;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.serde2.SerDe;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hive.hcatalog.data.HCatRecord;
 import org.apache.hive.hcatalog.data.LazyHCatRecord;
@@ -78,7 +78,7 @@ public class DefaultHCatScheme extends HCatScheme {
 	 */
 	@Override
 	protected HCatSchema getTableHCatSchema(Table table, String filter,
-			JobConf conf) {
+			Configuration conf) {
 		return CascadingHCatUtil.buildHCatSchema(table.getCols());
 	}
 

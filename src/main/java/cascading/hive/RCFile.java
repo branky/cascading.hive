@@ -22,13 +22,8 @@ import cascading.tap.Tap;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.type.CoercibleType;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.Properties;
-import java.util.regex.Pattern;
 import org.apache.commons.codec.binary.Base64;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
 import org.apache.hadoop.hive.ql.io.RCFileOutputFormat;
 import org.apache.hadoop.hive.serde2.ByteStream;
@@ -37,21 +32,19 @@ import org.apache.hadoop.hive.serde2.columnar.BytesRefArrayWritable;
 import org.apache.hadoop.hive.serde2.columnar.BytesRefWritable;
 import org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe;
 import org.apache.hadoop.hive.serde2.columnar.ColumnarStruct;
-import org.apache.hadoop.hive.serde2.lazy.LazyBinary;
-import org.apache.hadoop.hive.serde2.lazy.LazyBoolean;
-import org.apache.hadoop.hive.serde2.lazy.LazyByte;
-import org.apache.hadoop.hive.serde2.lazy.LazyDouble;
-import org.apache.hadoop.hive.serde2.lazy.LazyFloat;
-import org.apache.hadoop.hive.serde2.lazy.LazyHiveDecimal;
-import org.apache.hadoop.hive.serde2.lazy.LazyInteger;
-import org.apache.hadoop.hive.serde2.lazy.LazyLong;
-import org.apache.hadoop.hive.serde2.lazy.LazyShort;
-import org.apache.hadoop.hive.serde2.lazy.LazyString;
-import org.apache.hadoop.hive.serde2.lazy.LazyTimestamp;
+import org.apache.hadoop.hive.serde2.lazy.*;
 import org.apache.hadoop.io.WritableComparable;
-import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.FileInputFormat;
+import org.apache.hadoop.mapred.FileOutputFormat;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.RecordReader;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Properties;
+import java.util.regex.Pattern;
 
 /**
  * This is a {@link Scheme} subclass. RCFile (Record Columnar File) format can partition the data horizontally(rows) and
@@ -60,7 +53,7 @@ import org.apache.hadoop.mapred.RecordReader;
  * This class mainly developed for writing Cascading output to RCFile format to be consumed by Hive afterwards. It also
  * support read RCFile format, also support optimization as Hive(less HDFS_BYTES_READ less CPU).
  */
-public class RCFile extends Scheme<JobConf, RecordReader, OutputCollector, Object[], Object[]> {
+public class RCFile extends Scheme<Configuration, RecordReader, OutputCollector, Object[], Object[]> {
 
     private transient ColumnarSerDe serde;
     private String[] types;
@@ -133,15 +126,16 @@ public class RCFile extends Scheme<JobConf, RecordReader, OutputCollector, Objec
     }
 
     @Override
-    public void sourceConfInit(FlowProcess<JobConf> flowProcess, Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
-        conf.setInputFormat(RCFileInputFormat.class);
+    public void sourceConfInit(FlowProcess<? extends Configuration> flowProcess, Tap<Configuration, RecordReader, OutputCollector> tap, Configuration conf) {
+        conf.setBoolean("mapred.mapper.new-api", false);
+        conf.setClass("mapred.input.format.class", RCFileInputFormat.class, FileInputFormat.class);
         if (selectedColIds != null) {
             conf.set(HiveProps.HIVE_SELECTD_COLUMN_IDS, selectedColIds);
         }
     }
 
     @Override
-    public void sourcePrepare(FlowProcess<JobConf> flowProcess, SourceCall<Object[], RecordReader> sourceCall ) throws IOException {
+    public void sourcePrepare(FlowProcess<? extends Configuration> flowProcess, SourceCall<Object[], RecordReader> sourceCall ) throws IOException {
         if (serde == null) {
             try {
                 serde = new ColumnarSerDe();
@@ -174,7 +168,7 @@ public class RCFile extends Scheme<JobConf, RecordReader, OutputCollector, Objec
     }
 
     @Override
-    public void sourceCleanup(FlowProcess<JobConf> flowProcess,
+    public void sourceCleanup(FlowProcess<? extends Configuration> flowProcess,
                               SourceCall<Object[], RecordReader> sourceCall) {
         sourceCall.setContext(null);
     }
@@ -186,7 +180,7 @@ public class RCFile extends Scheme<JobConf, RecordReader, OutputCollector, Objec
     }
 
     @Override
-    public boolean source(FlowProcess<JobConf> flowProcess, SourceCall<Object[], RecordReader> sourceCall) throws IOException {
+    public boolean source(FlowProcess<? extends Configuration> flowProcess, SourceCall<Object[], RecordReader> sourceCall) throws IOException {
         if (!sourceReadInput(sourceCall))
             return false;
         Tuple tuple = sourceCall.getIncomingEntry().getTuple();
@@ -207,15 +201,16 @@ public class RCFile extends Scheme<JobConf, RecordReader, OutputCollector, Objec
     }
 
     @Override
-    public void sinkConfInit(FlowProcess<JobConf> flowProcess, Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
-        conf.setOutputKeyClass(WritableComparable.class);
-        conf.setOutputValueClass(BytesRefArrayWritable.class);
-        conf.setOutputFormat(RCFileOutputFormat.class );
+    public void sinkConfInit(FlowProcess<? extends Configuration> flowProcess, Tap<Configuration, RecordReader, OutputCollector> tap, Configuration conf) {
+        conf.setBoolean("mapred.mapper.new-api", false);
+        conf.setClass("mapred.output.key.class", WritableComparable.class, Object.class);
+        conf.setClass("mapred.output.value.class", BytesRefArrayWritable.class, Object.class);
+        conf.setClass("mapred.output.format.class", RCFileOutputFormat.class, FileOutputFormat.class);
         conf.set(HiveProps.HIVE_COLUMN_NUMBER, String.valueOf(getSinkFields().size()));
     }
 
     @Override
-    public void sinkPrepare(FlowProcess<JobConf> flowProcess, SinkCall<Object[], OutputCollector> sinkCall ) throws IOException {
+    public void sinkPrepare(FlowProcess<? extends Configuration> flowProcess, SinkCall<Object[], OutputCollector> sinkCall ) throws IOException {
         sinkCall.setContext(new Object[3]);
         sinkCall.getContext()[0] = new ByteStream.Output();
         sinkCall.getContext()[1] = new BytesRefArrayWritable();
@@ -223,13 +218,13 @@ public class RCFile extends Scheme<JobConf, RecordReader, OutputCollector, Objec
     }
 
     @Override
-    public void sinkCleanup(FlowProcess<JobConf> flowProcess,
+    public void sinkCleanup(FlowProcess<? extends Configuration> flowProcess,
                             SinkCall<Object[], OutputCollector> sinkCall) {
         sinkCall.setContext(null);
     }
 
     @Override
-    public void sink(FlowProcess<JobConf> flowProcess, SinkCall<Object[], OutputCollector> sinkCall) throws IOException {
+    public void sink(FlowProcess<? extends Configuration> flowProcess, SinkCall<Object[], OutputCollector> sinkCall) throws IOException {
         Tuple tuple = sinkCall.getOutgoingEntry().getTuple();
 
         ByteStream.Output byteStream = (ByteStream.Output) sinkCall.getContext()[0];

@@ -16,7 +16,7 @@ package cascading.hive;
 
 import cascading.flow.Flow;
 import cascading.flow.FlowConnector;
-import cascading.flow.hadoop.HadoopFlowConnector;
+import cascading.flow.hadoop2.Hadoop2MR1FlowConnector;
 import cascading.functions.ConvertToHiveJavaType;
 import cascading.pipe.Each;
 import cascading.pipe.Pipe;
@@ -29,19 +29,18 @@ import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntryIterator;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
 import org.apache.commons.io.FileUtils;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+
+import static org.junit.Assert.*;
 
 public class RCFileTest {
   private static final String RC_FILE = "src/test/resources/data/rc_test.rc";
@@ -68,7 +67,7 @@ public class RCFileTest {
   public void setup() {
     Preconditions.checkArgument(COLUMNS.length == TYPES.length);
 
-    connector = new HadoopFlowConnector(new Properties());
+    connector = new Hadoop2MR1FlowConnector(new Properties());
   }
 
   @AfterClass
@@ -109,7 +108,7 @@ public class RCFileTest {
     p.put("mapred.output.compression.type", "BLOCK");
     // GzipCodec needs native lib, otherwise the output can be read.
     // p.put("mapred.output.compression.codec", "org.apache.hadoop.io.compress.GzipCodec");
-    connector = new HadoopFlowConnector(p);
+    connector = new Hadoop2MR1FlowConnector(p);
 
     Fields fields = new Fields(COLUMNS);
 

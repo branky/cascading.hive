@@ -17,6 +17,7 @@ package cascading.hcatalog;
 import cascading.cascade.CascadeException;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -27,7 +28,6 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
-import org.apache.hadoop.mapred.JobConf;
 import org.apache.hive.hcatalog.common.HCatException;
 import org.apache.hive.hcatalog.common.HCatUtil;
 import org.apache.hive.hcatalog.data.schema.HCatSchema;
@@ -36,8 +36,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -62,7 +60,7 @@ public class CascadingHCatUtil {
 	 * @return A list of locations
 	 */
 	public static List<String> getDataStorageLocation(String db, String table,
-			String filter, JobConf jobConf) {
+			String filter, Configuration jobConf) {
 		Preconditions.checkNotNull(table, "Table name must not be null");
 
 		HiveMetaStoreClient client = null;
@@ -111,7 +109,7 @@ public class CascadingHCatUtil {
 		return locations;
 	}
 
-    protected static List<String> getFilesInHivePartition(Partition part, JobConf jobConf) {
+    protected static List<String> getFilesInHivePartition(Partition part, Configuration jobConf) {
         List<String> result = newArrayList();
 
         String ignoreFileRegex = jobConf.get(HCatTap.IGNORE_FILE_IN_PARTITION_REGEX, "");
@@ -147,7 +145,7 @@ public class CascadingHCatUtil {
 	 * @return 
 	 */
 	public static boolean setDataStorageLocation(String db, String table,
-			String filter, String path, JobConf jobConf) {
+			String filter, String path, Configuration jobConf) {
 		Preconditions.checkNotNull(table, "Table name must not be null");
 
 		HiveMetaStoreClient client = null;
@@ -175,7 +173,7 @@ public class CascadingHCatUtil {
 		return true;
 	}
 
-	public static Table getHiveTable(String db, String table, JobConf conf) {
+	public static Table getHiveTable(String db, String table, Configuration conf) {
 		HiveMetaStoreClient client = null;
 		Table hiveTable = null;
 
@@ -197,7 +195,7 @@ public class CascadingHCatUtil {
 		return hiveTable;
 	}
 
-	private static HiveMetaStoreClient getHiveMetaStoreClient(JobConf jobConf)
+	private static HiveMetaStoreClient getHiveMetaStoreClient(Configuration jobConf)
 			throws IOException, MetaException {
 		HiveConf hiveConf = HCatUtil.getHiveConf(jobConf);
 

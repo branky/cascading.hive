@@ -17,8 +17,8 @@ package cascading.hive;
 import cascading.flow.Flow;
 import cascading.flow.FlowConnector;
 import cascading.flow.FlowDef;
-import cascading.flow.hadoop.HadoopFlowConnector;
 import cascading.flow.hadoop.HadoopFlowProcess;
+import cascading.flow.hadoop2.Hadoop2MR1FlowConnector;
 import cascading.operation.aggregator.Count;
 import cascading.operation.regex.RegexSplitGenerator;
 import cascading.pipe.Each;
@@ -31,13 +31,8 @@ import cascading.tap.SinkMode;
 import cascading.tap.Tap;
 import cascading.tap.hadoop.Hfs;
 import cascading.tap.hadoop.Lfs;
-import cascading.tuple.Fields;
-import cascading.tuple.Tuple;
-import cascading.tuple.TupleEntry;
-import cascading.tuple.TupleEntryCollector;
-import cascading.tuple.TupleEntryIterator;
+import cascading.tuple.*;
 import junitx.framework.FileAssert;
-
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
@@ -62,7 +57,7 @@ public class ORCFileTest {
 
     @Before
     public void setup() {
-        connector = new HadoopFlowConnector(new Properties());
+        connector = new Hadoop2MR1FlowConnector(new Properties());
         orc = "src/test/resources/data/test.orc";
         txt = "src/test/resources/data/test.txt";
         
@@ -115,7 +110,7 @@ public class ORCFileTest {
 //        p.put("mapred.output.compression.codec", "org.apache.hadoop.io.compress.GzipCodec");
         p.put("orc.compress", "SNAPPY");
         p.put("orc.create.index", "false");
-        connector = new HadoopFlowConnector(p);
+        connector = new Hadoop2MR1FlowConnector(p);
 
         Lfs input = new Lfs(new TextDelimited(true, ","), txt);
         Pipe pipe = new Pipe("convert");

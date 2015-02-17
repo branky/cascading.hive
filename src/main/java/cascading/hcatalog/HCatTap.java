@@ -21,7 +21,7 @@ import cascading.tap.Tap;
 import cascading.tuple.Fields;
 import cascading.tuple.TupleEntryCollector;
 import cascading.tuple.TupleEntryIterator;
-import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.RecordReader;
 import org.slf4j.Logger;
@@ -37,7 +37,7 @@ import java.util.List;
  * 
  */
 @SuppressWarnings("serial")
-public class HCatTap extends Tap<JobConf, RecordReader, OutputCollector> {
+public class HCatTap extends Tap<Configuration, RecordReader, OutputCollector> {
     public static final String IGNORE_FILE_IN_PARTITION_REGEX = "hive-tap.path.partition.file.ignore-regex";
 
     /** Field LOG */
@@ -47,7 +47,7 @@ public class HCatTap extends Tap<JobConf, RecordReader, OutputCollector> {
 	private String table;
 	private String filter;
 	private String path;
-	private Tap<JobConf, RecordReader, OutputCollector> tap;
+	private Tap<Configuration, RecordReader, OutputCollector> tap;
     private String identifier;
 
 	public HCatTap(String table) {
@@ -88,7 +88,7 @@ public class HCatTap extends Tap<JobConf, RecordReader, OutputCollector> {
 	 * @param sinkMode 
 	 */
 	public HCatTap(String db, String table, String filter,
-                   Scheme<JobConf,RecordReader,OutputCollector,?,?> hCatScheme,
+                   Scheme<Configuration,RecordReader,OutputCollector,?,?> hCatScheme,
                    String path,
                    Fields sourceField,
 			       SinkMode sinkMode) {
@@ -120,7 +120,7 @@ public class HCatTap extends Tap<JobConf, RecordReader, OutputCollector> {
     }
 
 	@Override
-	public void sourceConfInit(FlowProcess<JobConf> process, JobConf conf) {
+	public void sourceConfInit(FlowProcess<? extends Configuration> process, Configuration conf) {
 		tap = TapFactory.createSourceTap(getScheme(),
                 CascadingHCatUtil.getDataStorageLocation(db, table, filter,
                         conf));
@@ -129,7 +129,7 @@ public class HCatTap extends Tap<JobConf, RecordReader, OutputCollector> {
 	}
 
 	@Override
-	public void sinkConfInit(FlowProcess<JobConf> process, JobConf conf) {
+	public void sinkConfInit(FlowProcess<? extends Configuration> process, Configuration conf) {
 		List<String> pathes = new ArrayList<String>();
 
 		// Write to the same location as the where current table is stored
@@ -149,40 +149,41 @@ public class HCatTap extends Tap<JobConf, RecordReader, OutputCollector> {
         return identifier;
 	}
 
+
 	@Override
-	public TupleEntryIterator openForRead(FlowProcess<JobConf> flowProcess,
+	public TupleEntryIterator openForRead(FlowProcess<? extends Configuration> flowProcess,
 			RecordReader input) throws IOException {
 		return tap.openForRead(flowProcess, input);
 	}
 
 	@Override
-	public TupleEntryCollector openForWrite(FlowProcess<JobConf> flowProcess,
+	public TupleEntryCollector openForWrite(FlowProcess<? extends Configuration> flowProcess,
 			OutputCollector output) throws IOException {
 		return tap.openForWrite(flowProcess, output);
 	}
 
 	@Override
-	public boolean createResource(JobConf conf) throws IOException {
+	public boolean createResource(Configuration conf) throws IOException {
 		return tap.createResource(conf);
 	}
 
 	@Override
-	public boolean deleteResource(JobConf conf) throws IOException {
+	public boolean deleteResource(Configuration conf) throws IOException {
 		return tap.deleteResource(conf);
 	}
 
 	@Override
-	public boolean resourceExists(JobConf conf) throws IOException {
+	public boolean resourceExists(Configuration conf) throws IOException {
 		return tap.resourceExists(conf);
 	}
 
 	@Override
-	public long getModifiedTime(JobConf conf) throws IOException {
+	public long getModifiedTime(Configuration conf) throws IOException {
 		return tap.getModifiedTime(conf);
 	}
 
 	@Override
-	public boolean commitResource(JobConf conf) throws IOException {
+	public boolean commitResource(Configuration conf) throws IOException {
         if (tap.commitResource(conf)) {
             if (path != null) {
                 // Set the path as the new table location
